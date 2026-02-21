@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError, GAS_OVERRIDES } from '../utils/contracts';
 import {
   IconRefresh, IconExternalLink, IconShield, IconEngine,
   IconTreasury, IconArrowRight, IconPolicy, IconCheck,
@@ -63,7 +63,7 @@ const FirewallStatus: React.FC = () => {
       const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, signer);
       const action = m.pePaused ? 'unpause' : 'pause';
       toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} PolicyEngine…`);
-      const tx = m.pePaused ? await pe.unpause() : await pe.pause();
+      const tx = m.pePaused ? await pe.unpause(GAS_OVERRIDES) : await pe.pause(GAS_OVERRIDES);
       await tx.wait();
       toast('success', `PolicyEngine ${action}d`);
       setShowConfirm(null);
@@ -82,7 +82,7 @@ const FirewallStatus: React.FC = () => {
       const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, signer);
       const action = m.isPaused ? 'unpause' : 'pause';
       toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} Firewall…`);
-      const tx = m.isPaused ? await fw.unpause() : await fw.pause();
+      const tx = m.isPaused ? await fw.unpause(GAS_OVERRIDES) : await fw.pause(GAS_OVERRIDES);
       await tx.wait();
       toast('success', `TreasuryFirewall ${action}d`);
       setShowConfirm(null);
@@ -101,7 +101,7 @@ const FirewallStatus: React.FC = () => {
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
       const action = m.tPaused ? 'emergencyUnpause' : 'emergencyPause';
       toast('pending', `${m.tPaused ? 'Unpausing' : 'Pausing'} Treasury…`);
-      const tx = m.tPaused ? await treasury.emergencyUnpause() : await treasury.emergencyPause();
+      const tx = m.tPaused ? await treasury.emergencyUnpause(GAS_OVERRIDES) : await treasury.emergencyPause(GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Treasury ${m.tPaused ? 'unpaused' : 'paused'}`);
       setShowConfirm(null);

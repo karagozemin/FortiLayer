@@ -329,3 +329,9 @@ export function parseContractError(err: any): string {
   }
   return 'Transaction failed';
 }
+
+// ── Gas Override for Arbitrum Sepolia ───────────────────────────
+// Arbitrum Sepolia often needs boosted gas to avoid stuck transactions
+export const GAS_OVERRIDES = {
+  gasLimit: 3_000_000n,
+};

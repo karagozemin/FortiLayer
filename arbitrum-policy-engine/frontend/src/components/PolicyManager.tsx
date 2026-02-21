@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError, GAS_OVERRIDES } from '../utils/contracts';
 import { IconRefresh, IconExternalLink, IconPlus, IconTrash, IconChevronDown } from './Icons';
 import { useToast } from './Toast';
 
@@ -168,7 +168,7 @@ const PolicyManager: React.FC = () => {
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, signer);
       toast('pending', 'Adding to whitelist…');
-      const tx = await c.addToVaultWhitelist(DEPLOYED_ADDRESSES.treasury, wlAddr);
+      const tx = await c.addToVaultWhitelist(DEPLOYED_ADDRESSES.treasury, wlAddr, GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Added ${shortenAddress(wlAddr)} to whitelist`);
       setWlAddr('');
@@ -193,7 +193,7 @@ const PolicyManager: React.FC = () => {
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, signer);
       toast('pending', 'Removing from whitelist…');
-      const tx = await c.removeFromVaultWhitelist(DEPLOYED_ADDRESSES.treasury, addr);
+      const tx = await c.removeFromVaultWhitelist(DEPLOYED_ADDRESSES.treasury, addr, GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Removed ${shortenAddress(addr)} from whitelist`);
       setWlRemoveAddr('');
@@ -211,7 +211,7 @@ const PolicyManager: React.FC = () => {
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, signer);
       const amt = ethers.parseUnits(slDailyLimit, 6);
       toast('pending', 'Setting daily limit…');
-      const tx = await c.setVaultDailyLimit(DEPLOYED_ADDRESSES.treasury, amt);
+      const tx = await c.setVaultDailyLimit(DEPLOYED_ADDRESSES.treasury, amt, GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Daily limit set to ${slDailyLimit} USDC`);
       setSlDailyLimit('');
@@ -229,7 +229,7 @@ const PolicyManager: React.FC = () => {
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, signer);
       const amt = ethers.parseUnits(slMaxTx, 6);
       toast('pending', 'Setting max per tx…');
-      const tx = await c.setVaultMaxTxAmount(DEPLOYED_ADDRESSES.treasury, amt);
+      const tx = await c.setVaultMaxTxAmount(DEPLOYED_ADDRESSES.treasury, amt, GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Max per tx set to ${slMaxTx} USDC`);
       setSlMaxTx('');
@@ -250,7 +250,7 @@ const PolicyManager: React.FC = () => {
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, signer);
       toast('pending', 'Setting risk score…');
-      const tx = await c.setRiskScore(rsAddr, Number(rsScore));
+      const tx = await c.setRiskScore(rsAddr, Number(rsScore), GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Risk score for ${shortenAddress(rsAddr)} set to ${rsScore}`);
       setRsAddr('');
@@ -272,7 +272,7 @@ const PolicyManager: React.FC = () => {
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, signer);
       toast('pending', 'Setting min threshold…');
-      const tx = await c.setMinThreshold(Number(rsThreshold));
+      const tx = await c.setMinThreshold(Number(rsThreshold), GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Min threshold set to ${rsThreshold}`);
       setRsThreshold('');
@@ -289,7 +289,7 @@ const PolicyManager: React.FC = () => {
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy, signer);
       toast('pending', 'Setting timelock duration…');
-      const tx = await c.setVaultTimelockDuration(DEPLOYED_ADDRESSES.treasury, Number(tlDuration));
+      const tx = await c.setVaultTimelockDuration(DEPLOYED_ADDRESSES.treasury, Number(tlDuration), GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Timelock duration set to ${tlDuration}s`);
       setTlDuration('');

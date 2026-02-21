@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp, getExplorerUrl, parseContractError } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp, getExplorerUrl, parseContractError, GAS_OVERRIDES } from '../utils/contracts';
 import { IconRefresh, IconTreasury, IconShield, IconPolicy, IconActivity, IconExternalLink, IconSend, IconChevronDown, IconDownload } from './Icons';
 import { useToast } from './Toast';
 
@@ -119,7 +119,7 @@ const Dashboard: React.FC = () => {
       const usdc = new ethers.Contract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC, signer);
       const amt = ethers.parseUnits(mintAmount, 6);
       toast('pending', 'Minting USDC…');
-      const tx = await usdc.mint(await signer.getAddress(), amt);
+      const tx = await usdc.mint(await signer.getAddress(), amt, GAS_OVERRIDES);
       await tx.wait();
       toast('success', `Minted ${mintAmount} USDC`);
       setLastTxResult({ type: 'success', msg: `Minted ${mintAmount} USDC`, hash: tx.hash });
@@ -144,12 +144,12 @@ const Dashboard: React.FC = () => {
 
       // Approve first
       toast('pending', 'Approving USDC…');
-      const approveTx = await usdc.approve(DEPLOYED_ADDRESSES.treasury, amt);
+      const approveTx = await usdc.approve(DEPLOYED_ADDRESSES.treasury, amt, GAS_OVERRIDES);
       await approveTx.wait();
 
       // Deposit
       toast('pending', 'Depositing to Treasury…');
-      const depTx = await treasury.deposit(DEPLOYED_ADDRESSES.mockUSDC, amt);
+      const depTx = await treasury.deposit(DEPLOYED_ADDRESSES.mockUSDC, amt, GAS_OVERRIDES);
       await depTx.wait();
 
       toast('success', `Deposited ${depositAmount} USDC to Treasury`);
@@ -174,7 +174,7 @@ const Dashboard: React.FC = () => {
       const amt = ethers.parseUnits(sendAmount, 6);
 
       toast('pending', 'Requesting transfer through firewall…');
-      const tx = await treasury.requestTransfer(DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt);
+      const tx = await treasury.requestTransfer(DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt, GAS_OVERRIDES);
       const receipt = await tx.wait();
 
       // Check if it was passed or blocked by looking at events
