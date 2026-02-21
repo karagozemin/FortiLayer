@@ -460,7 +460,7 @@ const PolicyManager: React.FC = () => {
           const isMS = p.name === 'MultiSigPolicy';
 
           return (
-            <div key={p.address} className={`policy-card ${!p.active ? 'inactive' : ''}`} style={isMS ? { gridColumn: '1 / -1' } : undefined}>
+            <div key={p.address} className={`policy-card ${!p.active ? 'inactive' : ''}`}>
               <div className="policy-card-head">
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div className="policy-icon-box" style={{ background: p.bgColor, color: p.color, width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700 }}>
@@ -486,137 +486,91 @@ const PolicyManager: React.FC = () => {
 
                 {/* ── MultiSig Actions ── */}
                 {isMS && (
-                  <div style={{ marginTop: 4 }}>
-                    {/* Tab bar */}
+                  <div>
+                    {/* Info row */}
+                    <div className="policy-param">
+                      <span className="p-label">Threshold</span>
+                      <span className="p-value" style={{ color: 'var(--purple)' }}>{msRequired} of {msSigners.length} signers</span>
+                    </div>
+
+                    {/* Compact tab bar */}
                     <div className="ms-tabs">
                       {(['approve', 'status', 'admin'] as const).map(tab => (
                         <button key={tab} className={`ms-tab ${msActiveTab === tab ? 'active' : ''}`} onClick={() => setMsActiveTab(tab)}>
-                          {tab === 'approve' ? '✍ Approve / Revoke' : tab === 'status' ? '🔍 Tx Status' : '⚙ Admin'}
+                          {tab === 'approve' ? '✍ Approve' : tab === 'status' ? '🔍 Status' : '⚙ Admin'}
                         </button>
                       ))}
                     </div>
 
-                    {/* ── Approve / Revoke Tab ── */}
+                    {/* ── Approve / Revoke ── */}
                     {msActiveTab === 'approve' && (
                       <div className="ms-tab-content">
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>
-                          Approve or revoke a pending transfer
-                        </div>
-                        <div className="ms-form-grid">
-                          <div className="ms-field">
-                            <label className="ms-label">Recipient</label>
-                            <input className="input mono" placeholder="0x… recipient address" value={msApproveTo} onChange={e => setMsApproveTo(e.target.value)} />
-                          </div>
-                          <div className="ms-field">
-                            <label className="ms-label">Amount (USDC)</label>
-                            <input className="input" type="number" placeholder="e.g. 500" value={msApproveAmt} onChange={e => setMsApproveAmt(e.target.value)} />
-                          </div>
-                          <div className="ms-field">
-                            <label className="ms-label">Token (optional, defaults to USDC)</label>
-                            <input className="input mono" placeholder={shortenAddress(DEPLOYED_ADDRESSES.mockUSDC)} value={msApproveToken} onChange={e => setMsApproveToken(e.target.value)} />
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                          <button className="btn btn-green" onClick={handleMsApprove} disabled={!!txPending || !msApproveTo || !msApproveAmt} style={{ flex: 1 }}>
-                            {txPending === 'ms-approve' ? 'Approving…' : '✓ Approve Transaction'}
+                        <input className="input mono" placeholder="0x… recipient" value={msApproveTo} onChange={e => setMsApproveTo(e.target.value)} style={{ width: '100%', marginBottom: 6 }} />
+                        <input className="input" type="number" placeholder="Amount (USDC)" value={msApproveAmt} onChange={e => setMsApproveAmt(e.target.value)} style={{ width: '100%', marginBottom: 8 }} />
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn-green" onClick={handleMsApprove} disabled={!!txPending || !msApproveTo || !msApproveAmt} style={{ flex: 1, fontSize: 11.5 }}>
+                            {txPending === 'ms-approve' ? '…' : '✓ Approve'}
                           </button>
-                          <button className="btn btn-red" onClick={handleMsRevoke} disabled={!!txPending || !msApproveTo || !msApproveAmt} style={{ flex: 1 }}>
-                            {txPending === 'ms-revoke' ? 'Revoking…' : '✗ Revoke Approval'}
+                          <button className="btn btn-red" onClick={handleMsRevoke} disabled={!!txPending || !msApproveTo || !msApproveAmt} style={{ flex: 1, fontSize: 11.5 }}>
+                            {txPending === 'ms-revoke' ? '…' : '✗ Revoke'}
                           </button>
                         </div>
                       </div>
                     )}
 
-                    {/* ── Tx Status Tab ── */}
+                    {/* ── Tx Status ── */}
                     {msActiveTab === 'status' && (
                       <div className="ms-tab-content">
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>
-                          Check approval status for a transfer
-                        </div>
-                        <div className="ms-form-grid">
-                          <div className="ms-field">
-                            <label className="ms-label">Recipient</label>
-                            <input className="input mono" placeholder="0x… recipient" value={msLookupTo} onChange={e => setMsLookupTo(e.target.value)} />
-                          </div>
-                          <div className="ms-field">
-                            <label className="ms-label">Amount (USDC)</label>
-                            <input className="input" type="number" placeholder="e.g. 500" value={msLookupAmt} onChange={e => setMsLookupAmt(e.target.value)} />
-                          </div>
-                          <div className="ms-field">
-                            <label className="ms-label">Token (optional)</label>
-                            <input className="input mono" placeholder={shortenAddress(DEPLOYED_ADDRESSES.mockUSDC)} value={msLookupToken} onChange={e => setMsLookupToken(e.target.value)} />
-                          </div>
-                        </div>
-                        <button className="btn btn-blue" onClick={handleMsLookup} disabled={!msLookupTo || !msLookupAmt} style={{ marginTop: 8, width: '100%' }}>
-                          🔍 Check Approval Status
+                        <input className="input mono" placeholder="0x… recipient" value={msLookupTo} onChange={e => setMsLookupTo(e.target.value)} style={{ width: '100%', marginBottom: 6 }} />
+                        <input className="input" type="number" placeholder="Amount (USDC)" value={msLookupAmt} onChange={e => setMsLookupAmt(e.target.value)} style={{ width: '100%', marginBottom: 6 }} />
+                        <button className="btn btn-blue" onClick={handleMsLookup} disabled={!msLookupTo || !msLookupAmt} style={{ width: '100%', fontSize: 11.5 }}>
+                          🔍 Check Status
                         </button>
-
                         {msLookupResult && (
                           <div className="ms-result-box">
-                            <div className="policy-param">
-                              <span className="p-label">Tx Hash</span>
-                              <code className="p-value" style={{ fontSize: 10 }}>{msLookupResult.hash.slice(0, 18)}…{msLookupResult.hash.slice(-8)}</code>
-                            </div>
-                            <div className="policy-param">
+                            <div className="policy-param" style={{ padding: '3px 0' }}>
                               <span className="p-label">Approvals</span>
                               <span className="p-value" style={{ color: msLookupResult.enough ? 'var(--green)' : 'var(--amber)' }}>
-                                {msLookupResult.count} / {msRequired} {msLookupResult.enough ? '✓ Ready' : '⏳ Pending'}
+                                {msLookupResult.count}/{msRequired} {msLookupResult.enough ? '✓' : '⏳'}
                               </span>
                             </div>
-                            <div style={{ marginTop: 6 }}>
-                              <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>Signer Votes</div>
-                              {msSigners.map((s, i) => (
-                                <div key={i} className="policy-param">
-                                  <code className="p-label" style={{ fontSize: 11 }}>{shortenAddress(s)}</code>
-                                  <span className="p-value">
-                                    {msLookupResult.signerApprovals[s]
-                                      ? <span style={{ color: 'var(--green)' }}>✓ Approved</span>
-                                      : <span style={{ color: 'var(--text-3)' }}>— Not yet</span>}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
+                            {msSigners.map((s, i) => (
+                              <div key={i} className="policy-param" style={{ padding: '2px 0' }}>
+                                <code className="p-label" style={{ fontSize: 10.5 }}>{shortenAddress(s)}</code>
+                                <span className="p-value" style={{ fontSize: 11 }}>
+                                  {msLookupResult.signerApprovals[s]
+                                    ? <span style={{ color: 'var(--green)' }}>✓</span>
+                                    : <span style={{ color: 'var(--text-3)' }}>—</span>}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* ── Admin Tab ── */}
+                    {/* ── Admin ── */}
                     {msActiveTab === 'admin' && (
                       <div className="ms-tab-content">
-                        {/* Signers list */}
-                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>
-                          Signers ({msSigners.length}) — Required: {msRequired}
-                        </div>
                         {msSigners.map((s, i) => (
-                          <div key={i} className="inline-action" style={{ padding: '6px 0' }}>
-                            <code style={{ fontSize: 11.5, flex: 1 }}>#{i + 1} {shortenAddress(s)}</code>
-                            <button className="btn btn-red" onClick={() => handleMsRemoveSigner(s)} disabled={!!txPending} style={{ fontSize: 11, padding: '4px 8px' }}>
-                              <IconTrash style={{ width: 12, height: 12 }} />
+                          <div key={i} className="inline-action" style={{ padding: '4px 0' }}>
+                            <code style={{ fontSize: 10.5, flex: 1 }}>#{i + 1} {shortenAddress(s)}</code>
+                            <button className="btn btn-red" onClick={() => handleMsRemoveSigner(s)} disabled={!!txPending} style={{ fontSize: 10, padding: '3px 6px' }}>
+                              <IconTrash style={{ width: 11, height: 11 }} />
                             </button>
                           </div>
                         ))}
-
-                        {/* Add signer */}
-                        <div style={{ marginTop: 10 }}>
-                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>Add New Signer</div>
-                          <div className="inline-action">
-                            <input className="input mono" placeholder="0x… new signer address" value={msNewSigner} onChange={e => setMsNewSigner(e.target.value)} style={{ flex: 1 }} />
-                            <button className="btn btn-green" onClick={handleMsAddSigner} disabled={!!txPending || !msNewSigner} style={{ fontSize: 12 }}>
-                              <IconPlus style={{ width: 13, height: 13 }} /> {txPending === 'ms-add-signer' ? 'Adding…' : 'Add'}
-                            </button>
-                          </div>
+                        <div className="inline-action" style={{ marginTop: 6 }}>
+                          <input className="input mono" placeholder="0x… new signer" value={msNewSigner} onChange={e => setMsNewSigner(e.target.value)} style={{ flex: 1 }} />
+                          <button className="btn btn-green" onClick={handleMsAddSigner} disabled={!!txPending || !msNewSigner} style={{ fontSize: 11, padding: '5px 8px' }}>
+                            <IconPlus style={{ width: 12, height: 12 }} /> {txPending === 'ms-add-signer' ? '…' : 'Add'}
+                          </button>
                         </div>
-
-                        {/* Set required */}
-                        <div style={{ marginTop: 10 }}>
-                          <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>Required Approvals</div>
-                          <div className="inline-action">
-                            <input className="input" type="number" placeholder={`Current: ${msRequired}`} value={msNewRequired} onChange={e => setMsNewRequired(e.target.value)} style={{ flex: 1 }} />
-                            <button className="btn btn-blue" onClick={handleMsSetRequired} disabled={!!txPending || !msNewRequired} style={{ fontSize: 12 }}>
-                              {txPending === 'ms-set-req' ? 'Setting…' : 'Set Threshold'}
-                            </button>
-                          </div>
+                        <div className="inline-action">
+                          <input className="input" type="number" placeholder={`Required (now ${msRequired})`} value={msNewRequired} onChange={e => setMsNewRequired(e.target.value)} style={{ flex: 1 }} />
+                          <button className="btn btn-blue" onClick={handleMsSetRequired} disabled={!!txPending || !msNewRequired} style={{ fontSize: 11, padding: '5px 8px' }}>
+                            {txPending === 'ms-set-req' ? '…' : 'Set'}
+                          </button>
                         </div>
                       </div>
                     )}
