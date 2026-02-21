@@ -23,5 +23,8 @@
     "artifacts",
     "cache",
     "frontend"
+  ],
+  "references": [
+    { "path": "./frontend" }
   ]
 }
