@@ -7,7 +7,7 @@ import { ethers } from "hardhat";
  * 1. PolicyEngine (core validation orchestrator)
  * 2. TreasuryFirewall (execution control layer)
  * 3. PolicyRegistry (approved policy whitelist)
- * 4. Policy Modules (SpendingLimit, Whitelist, Timelock, RiskScore)
+ * 4. Policy Modules (SpendingLimit, Whitelist, Timelock, RiskScore, MultiSig)
  * 5. MockUSDC (for demo/testing)
  * 6. Treasury (institutional vault)
  */
@@ -81,6 +81,13 @@ async function main() {
   const riskScoreAddr = await riskScore.getAddress();
   console.log(`   ✅ RiskScorePolicy deployed to: ${riskScoreAddr}`);
 
+  console.log("📦 Deploying MultiSigPolicy...");
+  const MultiSigPolicy = await ethers.getContractFactory("MultiSigPolicy");
+  const multiSig = await MultiSigPolicy.deploy(policyEngineAddr, [deployer.address], 1);
+  await multiSig.waitForDeployment();
+  const multiSigAddr = await multiSig.getAddress();
+  console.log(`   ✅ MultiSigPolicy deployed to: ${multiSigAddr}`);
+
   // ─── 5. Deploy MockUSDC ────────────────────────────────────────────────
   console.log("📦 Deploying MockUSDC...");
   const MockUSDC = await ethers.getContractFactory("MockUSDC");
@@ -121,12 +128,16 @@ async function main() {
   console.log("   → Adding TimelockPolicy to vault...");
   await (await policyEngine.addPolicy(treasuryAddr, timelockAddr)).wait();
 
+  console.log("   → Adding MultiSigPolicy to vault...");
+  await (await policyEngine.addPolicy(treasuryAddr, multiSigAddr)).wait();
+
   // Register policies in the global registry
   console.log("   → Registering policies in PolicyRegistry...");
   await (await registry.registerPolicy(spendingLimitAddr)).wait();
   await (await registry.registerPolicy(whitelistAddr)).wait();
   await (await registry.registerPolicy(timelockAddr)).wait();
   await (await registry.registerPolicy(riskScoreAddr)).wait();
+  await (await registry.registerPolicy(multiSigAddr)).wait();
 
   console.log("   ✅ Configuration complete!");
 
@@ -134,30 +145,19 @@ async function main() {
   console.log("\n══════════════════════════════════════════════════════════");
   console.log("  🛡  FortiLayer — Deployment Summary");
   console.log("══════════════════════════════════════════════════════════");
-  console.log(`  PolicyEngine:       ${policyEngineAddr}`);
-  console.log(`  TreasuryFirewall:   ${firewallAddr}`);
-  console.log(`  PolicyRegistry:     ${registryAddr}`);
-  console.log(`  SpendingLimitPolicy:${spendingLimitAddr}`);
-  console.log(`  WhitelistPolicy:    ${whitelistAddr}`);
-  console.log(`  TimelockPolicy:     ${timelockAddr}`);
-  console.log(`  RiskScorePolicy:    ${riskScoreAddr}`);
-  console.log(`  MockUSDC:           ${usdcAddr}`);
-  console.log(`  Treasury:           ${treasuryAddr}`);
+  console.log(`  PolicyEngine:        ${policyEngineAddr}`);
+  console.log(`  TreasuryFirewall:    ${firewallAddr}`);
+  console.log(`  PolicyRegistry:      ${registryAddr}`);
+  console.log(`  SpendingLimitPolicy: ${spendingLimitAddr}`);
+  console.log(`  WhitelistPolicy:     ${whitelistAddr}`);
+  console.log(`  TimelockPolicy:      ${timelockAddr}`);
+  console.log(`  RiskScorePolicy:     ${riskScoreAddr}`);
+  console.log(`  MultiSigPolicy:      ${multiSigAddr}`);
+  console.log(`  MockUSDC:            ${usdcAddr}`);
+  console.log(`  Treasury:            ${treasuryAddr}`);
   console.log("══════════════════════════════════════════════════════════");
   console.log("  ✅ Deployment complete! System is ready.");
   console.log("══════════════════════════════════════════════════════════\n");
-
-  return {
-    policyEngine: policyEngineAddr,
-    firewall: firewallAddr,
-    registry: registryAddr,
-    spendingLimit: spendingLimitAddr,
-    whitelist: whitelistAddr,
-    timelock: timelockAddr,
-    riskScore: riskScoreAddr,
-    usdc: usdcAddr,
-    treasury: treasuryAddr,
-  };
 }
 
 main()

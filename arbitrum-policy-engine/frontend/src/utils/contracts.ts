@@ -291,10 +291,6 @@ export function getExplorerUrl(txHash: string): string {
   return `https://sepolia.arbiscan.io/tx/${txHash}`;
 }
 
-export function getAddressExplorerUrl(address: string): string {
-  return `https://sepolia.arbiscan.io/address/${address}`;
-}
-
 /**
  * Extract a human-readable error message from a contract revert.
  * Handles custom Solidity errors, ethers.js error wrapping, and raw strings.

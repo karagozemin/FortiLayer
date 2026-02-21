@@ -1,35 +1,106 @@
 import { ethers } from "hardhat";
 
+/**
+ * FortiLayer — Live Contract Status Query
+ *
+ * Reads the current state of all deployed contracts on Arbitrum Sepolia.
+ * Run: npx hardhat run scripts/status.ts --network arbitrumSepolia
+ */
+
+// ── Current Deployed Addresses (Arbitrum Sepolia) ──────────────
+const ADDRESSES = {
+  policyEngine:       "0x245118Fba999F1ed338174933f83bdD6e08327D9",
+  treasuryFirewall:   "0xE3Be337BdC98Af11D3C8bcaB9149356Ac013EE98",
+  policyRegistry:     "0x5f36947d6d829616bAd785Be7eCb13cf9370DAff",
+  spendingLimitPolicy:"0x17580a550087C55CF68AD9Cc19F56862d8F35AEf",
+  whitelistPolicy:    "0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D29d2d6df",
+  timelockPolicy:     "0xa9BB981a309DEf9b74A390f2170fE56C2085062d",
+  riskScorePolicy:    "0x54305829743e301ebF8D868037B4081c90848924",
+  multiSigPolicy:     "0x1bA1BAC217cB0EeC50CCA40A4d83FAE9602c6244",
+  mockUSDC:           "0xee71e4d5b0D6588FFdf5713f9791eD63e66Ee1e9",
+  treasury:           "0x9BcF0E126b82C8E7cC5151C77025b052732eC52E",
+};
+
 async function main() {
-  console.log("🔍 Querying live contracts on Arbitrum Sepolia...\n");
-
-  const pe = await ethers.getContractAt("PolicyEngine", "0x3280d347389d68ebf628dAd21f1E5FBEeD20E39F");
-  console.log("📦 PolicyEngine:");
-  console.log("   Total Vaults:", (await pe.totalVaults()).toString());
-  console.log("   Total Txs Validated:", (await pe.totalTransactionsValidated()).toString());
-  console.log("   Paused:", await pe.paused());
-
-  const treasuryAddr = "0xb0F7E000A6052eEf0e909e4Af73FD77D95B4e76C";
-  const policies = await pe.getVaultPolicies(treasuryAddr);
-  console.log("   Treasury Policies:", policies.length);
-
-  const fw = await ethers.getContractAt("TreasuryFirewall", "0x00AE3a51149CF9256cC0fd3b1b1eC1c3D60728cc");
-  console.log("\n🛡 TreasuryFirewall:");
-  console.log("   Total Screened:", (await fw.totalScreened()).toString());
-  console.log("   Treasury Authorized:", await fw.isVaultAuthorized(treasuryAddr));
-
-  const usdc = await ethers.getContractAt("MockUSDC", "0x00a4D929e1FB4B34c2F11977bdCD5E9989Bd79aE");
   const [deployer] = await ethers.getSigners();
-  const bal = await usdc.balanceOf(await deployer.getAddress());
-  console.log("\n💰 MockUSDC:");
-  console.log("   Symbol:", await usdc.symbol());
-  console.log("   Deployer Balance:", ethers.formatUnits(bal, 6), "USDC");
 
-  const reg = await ethers.getContractAt("PolicyRegistry", "0x834e5b85d4C3ed0E1E3C5fe46eb97f5B962D956D");
-  console.log("\n📋 PolicyRegistry:");
-  console.log("   Approved Policies:", (await reg.getPolicyCount()).toString());
+  console.log("\n══════════════════════════════════════════════════════════");
+  console.log("  🛡  FortiLayer — Live Status");
+  console.log("══════════════════════════════════════════════════════════");
+  console.log(`  Querier:  ${deployer.address}`);
+  console.log(`  Network:  Arbitrum Sepolia`);
+  console.log("══════════════════════════════════════════════════════════\n");
 
-  console.log("\n✅ All contracts operational on Arbitrum Sepolia!");
+  // PolicyEngine
+  const pe = await ethers.getContractAt("PolicyEngine", ADDRESSES.policyEngine);
+  const totalVaults = await pe.totalVaults();
+  const totalValidated = await pe.totalTransactionsValidated();
+  const pePaused = await pe.paused();
+  const policies = await pe.getVaultPolicies(ADDRESSES.treasury);
+
+  console.log("📦 PolicyEngine:", ADDRESSES.policyEngine);
+  console.log(`   Total Vaults:          ${totalVaults}`);
+  console.log(`   Total Txs Validated:   ${totalValidated}`);
+  console.log(`   Paused:                ${pePaused}`);
+  console.log(`   Treasury Policies:     ${policies.length}`);
+  for (const p of policies) {
+    try {
+      const policy = await ethers.getContractAt("BasePolicy", p);
+      const name = await policy.policyName();
+      console.log(`     → ${name}: ${p}`);
+    } catch {
+      console.log(`     → Unknown: ${p}`);
+    }
+  }
+
+  // TreasuryFirewall
+  const fw = await ethers.getContractAt("TreasuryFirewall", ADDRESSES.treasuryFirewall);
+  const screened = await fw.totalScreened();
+  const passed = await fw.totalPassed();
+  const blocked = await fw.totalBlocked();
+  const fwPaused = await fw.paused();
+  const vaultAuth = await fw.isVaultAuthorized(ADDRESSES.treasury);
+
+  console.log("\n🛡  TreasuryFirewall:", ADDRESSES.treasuryFirewall);
+  console.log(`   Total Screened:        ${screened}`);
+  console.log(`   Passed:                ${passed}`);
+  console.log(`   Blocked:               ${blocked}`);
+  console.log(`   Paused:                ${fwPaused}`);
+  console.log(`   Treasury Authorized:   ${vaultAuth}`);
+
+  // PolicyRegistry
+  const reg = await ethers.getContractAt("PolicyRegistry", ADDRESSES.policyRegistry);
+  const policyCount = await reg.getPolicyCount();
+  console.log("\n📋 PolicyRegistry:", ADDRESSES.policyRegistry);
+  console.log(`   Registered Policies:   ${policyCount}`);
+
+  // MockUSDC
+  const usdc = await ethers.getContractAt("MockUSDC", ADDRESSES.mockUSDC);
+  const treasuryBal = await usdc.balanceOf(ADDRESSES.treasury);
+  const deployerBal = await usdc.balanceOf(deployer.address);
+
+  console.log("\n💰 MockUSDC:", ADDRESSES.mockUSDC);
+  console.log(`   Treasury Balance:      ${ethers.formatUnits(treasuryBal, 6)} USDC`);
+  console.log(`   Deployer Balance:      ${ethers.formatUnits(deployerBal, 6)} USDC`);
+
+  // Treasury
+  const treasury = await ethers.getContractAt("Treasury", ADDRESSES.treasury);
+  const tPaused = await treasury.paused();
+  const totalExecuted = await treasury.totalTransfersExecuted();
+
+  console.log("\n🏦 Treasury:", ADDRESSES.treasury);
+  console.log(`   Paused:                ${tPaused}`);
+  console.log(`   Total Executed:        ${totalExecuted}`);
+
+  // Summary
+  const passRate = Number(screened) > 0 ? ((Number(passed) / Number(screened)) * 100).toFixed(1) : "100.0";
+
+  console.log("\n══════════════════════════════════════════════════════════");
+  console.log(`  System:     ${!pePaused && !fwPaused && !tPaused ? '✅ OPERATIONAL' : '⚠️  DEGRADED'}`);
+  console.log(`  Policies:   ${policies.length} active on vault`);
+  console.log(`  Pass Rate:  ${passRate}%`);
+  console.log(`  Treasury:   ${ethers.formatUnits(treasuryBal, 6)} USDC`);
+  console.log("══════════════════════════════════════════════════════════\n");
 }
 
 main().catch(console.error);

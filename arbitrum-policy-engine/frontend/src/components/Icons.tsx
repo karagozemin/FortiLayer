@@ -1,7 +1,7 @@
 import React from 'react';
 
 type P = React.SVGProps<SVGSVGElement>;
-const I = (d: string) => React.memo((p: P) => (
+const pathIcon = (d: string) => React.memo((p: P) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
     strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" {...p}><path d={d}/></svg>
 ));
@@ -72,7 +72,7 @@ export const IconExternalLink = React.memo((p: P) => (
   </svg>
 ));
 
-export const IconArrowRight = I('M5 12h14M12 5l7 7-7 7');
+export const IconArrowRight = pathIcon('M5 12h14M12 5l7 7-7 7');
 
 export const IconCheck = React.memo((p: P) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -111,7 +111,7 @@ export const IconEngine = React.memo((p: P) => (
   </svg>
 ));
 
-export const IconClock = I('M12 2a10 10 0 100 20 10 10 0 000-20zM12 6v6l4 2');
+export const IconClock = pathIcon('M12 2a10 10 0 100 20 10 10 0 000-20zM12 6v6l4 2');
 
 export const IconUsers = React.memo((p: P) => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"

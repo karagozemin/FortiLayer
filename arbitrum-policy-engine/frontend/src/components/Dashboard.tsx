@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
 import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp, getExplorerUrl, parseContractError, GAS_OVERRIDES, waitForTx } from '../utils/contracts';
-import { IconRefresh, IconTreasury, IconShield, IconPolicy, IconActivity, IconExternalLink, IconSend, IconChevronDown, IconDownload } from './Icons';
+import { IconRefresh, IconTreasury, IconPolicy, IconActivity, IconExternalLink, IconSend, IconChevronDown, IconDownload } from './Icons';
 import { useToast } from './Toast';
 
 interface Stats {
