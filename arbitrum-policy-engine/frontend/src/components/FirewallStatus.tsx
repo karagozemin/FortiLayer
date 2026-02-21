@@ -7,6 +7,7 @@ import {
   IconTreasury, IconArrowRight, IconPolicy, IconCheck,
 } from './Icons';
 import { useToast } from './Toast';
+import logoImg from '../assets/logo.png';
 
 const FirewallStatus: React.FC = () => {
   const { provider, address } = useWallet();
@@ -123,7 +124,7 @@ const FirewallStatus: React.FC = () => {
     <>
       {/* Hero */}
       <div className="fw-hero">
-        <div className="shield-glow"><IconShield /></div>
+        <img src={logoImg} alt="FortiLayer" className="fw-hero-logo" />
         <h2>{systemOk ? 'Firewall Operational' : 'System Alert'}</h2>
         <p>
           {systemOk
