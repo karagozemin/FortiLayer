@@ -29,6 +29,29 @@ before a single token moves.
 
 ---
 
+## 🏆 Why FortiLayer Wins
+
+> **FortiLayer introduces a programmable execution layer — not just a multisig, not just a timelock, but a composable, atomic policy pipeline enforced at the transaction level.**
+
+This is the only project that delivers **all of the following**:
+
+| Capability | Status |
+|---|---|
+| **Composable execution firewall** — 5 independent policy modules with AND-logic enforcement | ✅ Shipped |
+| **Validate-then-record pattern** — two-phase atomic validation with zero state pollution | ✅ Shipped |
+| **Multi-layer circuit breaker** — 3 independent pause points, any one halts everything | ✅ Shipped |
+| **Pre-flight simulation** — off-chain policy check before gas spend (UX innovation) | ✅ Shipped |
+| **110-test suite** — unit + integration coverage across 10 test files | ✅ Shipped |
+| **10 verified contracts** — full source on Arbiscan, zero trust required | ✅ Shipped |
+| **Full React dashboard** — WalletConnect + 4 pages + MultiSig UI + toast system | ✅ Shipped |
+| **Stylus-ready architecture** — policy modules designed for Rust migration (10-100x gas reduction) | ✅ Designed |
+
+**This is not a proof-of-concept. This is deployable institutional infrastructure.**
+
+> *Most hackathon projects demonstrate an idea. FortiLayer demonstrates a product.*
+
+---
+
 ## 🔥 Vision
 
 > **Execution risk is greater than market risk.**
@@ -85,7 +108,7 @@ Every week, another protocol loses funds not because of a smart contract bug, bu
 
 ## 🏛 Why Arbitrum?
 
-FortiLayer is purpose-built for Arbitrum. Here's why:
+> **FortiLayer is not deployed on Arbitrum. FortiLayer is impossible without Arbitrum.**
 
 | Factor | Why It Matters |
 |---|---|
@@ -99,7 +122,11 @@ FortiLayer is purpose-built for Arbitrum. Here's why:
 
 > **Low cost enables frequent checks. High throughput enables scalable enforcement. Stylus enables high-performance policy logic.**
 
-FortiLayer isn't just deployed on Arbitrum — it's architecturally dependent on Arbitrum's cost and performance characteristics. A 5-policy validation pipeline on Ethereum mainnet would cost $15-50 per transfer. On Arbitrum, it costs under $0.01.
+### Architectural Dependency
+
+FortiLayer's 5-policy validation pipeline makes **5+ inter-contract calls per transfer**. This is economically impossible on Ethereum mainnet ($15-50/tx). On Arbitrum, it costs under $0.01.
+
+**Remove Arbitrum from this equation and the product ceases to exist.** That's not deployment convenience — that's architectural dependency. FortiLayer is native Arbitrum infrastructure.
 
 ---
 
@@ -149,6 +176,21 @@ E   ├──────┼──────────┼──────�
 ```
 
 > **Every known treasury attack vector is covered by at least one policy module. Most are covered by multiple overlapping layers.**
+
+---
+
+## 🎯 Product-Market Fit
+
+| Customer Segment | Problem | FortiLayer Solution |
+|---|---|---|
+| **DAO Treasuries** | Key compromise drains entire vault | Multi-layer execution firewall — spending limits + multi-sig + whitelist |
+| **RWA Issuers** | Regulatory compliance on every transfer | Per-vault programmable rules — whitelist + risk scoring |
+| **On-Chain Venture Funds** | Uncontrolled capital deployment | Daily + cumulative spending limits with auto-reset |
+| **Payroll Protocols** | Internal abuse / unauthorized payouts | Timelock cooldowns + recipient whitelists |
+| **Institutional Custodians** | Fiduciary duty enforcement | Full policy pipeline — every transfer auditable and policy-gated |
+| **L3 / Orbit Chains** | Native compliance layer needed | Embed FortiLayer as chain-level execution control |
+
+> **FortiLayer doesn't serve one niche. It's horizontal infrastructure for any entity that holds and moves value on-chain.**
 
 ---
 
@@ -631,6 +673,43 @@ FortiLayer/
 
 ---
 
+## 💰 Business Model
+
+FortiLayer is designed as **institutional infrastructure-as-a-service**:
+
+| Revenue Stream | Model | Target |
+|---|---|---|
+| **Vault deployment** | One-time setup fee per institutional vault | DAOs, funds, custodians |
+| **Policy subscription** | Monthly fee for managed policy configuration + monitoring | RWA issuers, payroll protocols |
+| **Premium policy modules** | Advanced compliance rules (geo-blocking, AML scoring, regulatory reporting) | Regulated entities |
+| **Stylus performance packs** | High-throughput policy execution in Rust — 10-100x gas savings | High-volume treasuries |
+| **Risk oracle integration** | Real-time address risk scoring via Chainlink/API3 feeds | All segments |
+
+**Target market size:** $50B+ in DAO treasuries alone, growing 40%+ YoY. RWA tokenization adds another $10T+ addressable market by 2030.
+
+> FortiLayer monetizes the gap between "money on-chain" and "controlled money on-chain."
+
+---
+
+## ⚔️ Competitive Edge
+
+| Dimension | Sentinel DAO | Gnosis Safe | Timelock Controllers | **FortiLayer** |
+|---|---|---|---|---|
+| Policy composability | Limited | ❌ None | ❌ None | **✅ 5 modules, AND logic** |
+| Validate-then-record | ❌ | ❌ | ❌ | **✅ Two-phase atomic** |
+| Pre-flight simulation | ❌ | ❌ | ❌ | **✅ Off-chain validate()** |
+| Multi-layer circuit breaker | Partial | ❌ | ❌ | **✅ 3 independent pauses** |
+| Per-vault configuration | ❌ Global | ❌ Per-safe | ❌ Global | **✅ Per-vault policies** |
+| Cumulative state tracking | ❌ | ❌ | ❌ | **✅ Daily resets, counters** |
+| Full frontend + WalletConnect | Weak | ✅ | ❌ | **✅ 4-page dashboard** |
+| Stylus-ready | ✅ Native | ❌ | ❌ | **✅ Designed for migration** |
+| Test coverage | Unknown | ✅ | Limited | **✅ 110 tests** |
+| Verified deployment | Unknown | ✅ | Varies | **✅ 10 contracts on Arbiscan** |
+
+> **FortiLayer doesn't compete with multisigs. It replaces the entire execution control paradigm.**
+
+---
+
 ## 📄 License
 
 MIT
@@ -641,7 +720,9 @@ MIT
 
 **Built for the Arbitrum ecosystem** 🔵
 
-*Execution risk is the last unsolved problem in DeFi. FortiLayer solves it.*
+*FortiLayer turns Arbitrum into programmable compliance infrastructure for institutional capital.*
+
+*Execution risk is the last unsolved problem in DeFi. We built the solution.*
 
 [Live Demo](https://fortilayer.vercel.app) · [Arbiscan](https://sepolia.arbiscan.io/address/0x245118Fba999F1ed338174933f83bdD6e08327D9) · [GitHub](https://github.com/karagozemin/FortiLayer)
 
