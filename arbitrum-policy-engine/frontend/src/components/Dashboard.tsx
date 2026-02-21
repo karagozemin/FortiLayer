@@ -26,7 +26,7 @@ interface ScreenEvent {
 }
 
 const Dashboard: React.FC = () => {
-  const { provider, signer } = useWallet();
+  const { provider } = useWallet();
   const [stats, setStats] = useState<Stats | null>(null);
   const [events, setEvents] = useState<ScreenEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,11 +35,10 @@ const Dashboard: React.FC = () => {
     if (!provider) return;
     setLoading(true);
     try {
-      const signerOrProvider = signer || provider;
-      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, signerOrProvider);
-      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, signerOrProvider);
-      const usdc = new ethers.Contract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC, signerOrProvider);
-      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signerOrProvider);
+      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
+      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, provider);
+      const usdc = new ethers.Contract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC, provider);
+      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, provider);
 
       // Fetch all stats in parallel
       const [totalVaults, totalTxValidated, isPaused, totalScreened, totalPassed, totalBlocked, treasuryBalance, vaultPolicies] = await Promise.all([
@@ -91,7 +90,7 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [provider, signer]);
+  }, [provider]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 

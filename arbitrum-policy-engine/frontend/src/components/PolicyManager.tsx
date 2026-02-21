@@ -21,7 +21,7 @@ const POLICY_META: Record<string, { icon: string; color: string }> = {
 };
 
 const PolicyManager: React.FC = () => {
-  const { provider, signer } = useWallet();
+  const { provider } = useWallet();
   const [policies, setPolicies] = useState<PolicyData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,8 +29,7 @@ const PolicyManager: React.FC = () => {
     if (!provider) return;
     setLoading(true);
     try {
-      const s = signer || provider;
-      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, s);
+      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
       const treasuryAddr = DEPLOYED_ADDRESSES.treasury;
 
       // Get active policies for the treasury vault
@@ -41,7 +40,7 @@ const PolicyManager: React.FC = () => {
 
       // SpendingLimitPolicy
       if (DEPLOYED_ADDRESSES.spendingLimitPolicy) {
-        const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, s);
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, provider);
         const [name, dailyLimit, maxTx, spent, remaining] = await Promise.all([
           c.policyName(),
           c.defaultDailyLimit(),
@@ -65,7 +64,7 @@ const PolicyManager: React.FC = () => {
 
       // WhitelistPolicy
       if (DEPLOYED_ADDRESSES.whitelistPolicy) {
-        const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, s);
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, provider);
         const [name, vaultList] = await Promise.all([
           c.policyName(),
           c.getVaultWhitelist(treasuryAddr),
@@ -87,7 +86,7 @@ const PolicyManager: React.FC = () => {
 
       // TimelockPolicy
       if (DEPLOYED_ADDRESSES.timelockPolicy) {
-        const c = new ethers.Contract(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy, s);
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy, provider);
         const [name, duration, lastTx, unlockTime, isExpired] = await Promise.all([
           c.policyName(),
           c.getEffectiveTimelockDuration(treasuryAddr),
@@ -112,7 +111,7 @@ const PolicyManager: React.FC = () => {
       // MultiSigPolicy (may not be deployed)
       if (DEPLOYED_ADDRESSES.multiSigPolicy) {
         try {
-          const c = new ethers.Contract(DEPLOYED_ADDRESSES.multiSigPolicy, ABIS.MultiSigPolicy, s);
+          const c = new ethers.Contract(DEPLOYED_ADDRESSES.multiSigPolicy, ABIS.MultiSigPolicy, provider);
           const [name, signers, required] = await Promise.all([
             c.policyName(),
             c.getSigners(),
@@ -133,7 +132,7 @@ const PolicyManager: React.FC = () => {
 
       // RiskScorePolicy
       if (DEPLOYED_ADDRESSES.riskScorePolicy) {
-        const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, s);
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, provider);
         const [name, threshold, defaultSc, maxScore] = await Promise.all([
           c.policyName(),
           c.minThreshold(),
@@ -159,7 +158,7 @@ const PolicyManager: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [provider, signer]);
+  }, [provider]);
 
   useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
 

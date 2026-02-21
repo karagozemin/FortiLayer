@@ -15,7 +15,7 @@ interface ScreenEvent {
 }
 
 const TransactionQueue: React.FC = () => {
-  const { provider, signer } = useWallet();
+  const { provider } = useWallet();
   const [events, setEvents] = useState<ScreenEvent[]>([]);
   const [filter, setFilter] = useState<'all' | 'passed' | 'blocked'>('all');
   const [loading, setLoading] = useState(true);
@@ -25,8 +25,7 @@ const TransactionQueue: React.FC = () => {
     if (!provider) return;
     setLoading(true);
     try {
-      const s = signer || provider;
-      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, s);
+      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, provider);
 
       // Fetch counters
       const [screened, passed, blocked] = await Promise.all([
@@ -67,7 +66,7 @@ const TransactionQueue: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [provider, signer]);
+  }, [provider]);
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 

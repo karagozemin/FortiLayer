@@ -4,7 +4,7 @@ import { useWallet } from '../hooks/useWallet';
 import { DEPLOYED_ADDRESSES, ABIS, shortenAddress } from '../utils/contracts';
 
 const FirewallStatus: React.FC = () => {
-  const { provider, signer, address } = useWallet();
+  const { provider, address } = useWallet();
   const [loading, setLoading] = useState(true);
   const [showConfirm, setShowConfirm] = useState(false);
   const [txPending, setTxPending] = useState(false);
@@ -25,10 +25,9 @@ const FirewallStatus: React.FC = () => {
     if (!provider) return;
     setLoading(true);
     try {
-      const s = signer || provider;
-      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, s);
-      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, s);
-      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, s);
+      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, provider);
+      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
+      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, provider);
 
       const [screened, passed, blocked, fwPaused, fwOwner, peAddr, pePaused, tPaused, vaultAuth, policies] = await Promise.all([
         fw.totalScreened(),
@@ -60,17 +59,18 @@ const FirewallStatus: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [provider, signer, address]);
+  }, [provider, address]);
 
   useEffect(() => { fetchMetrics(); }, [fetchMetrics]);
 
   const handleEmergencyToggle = async () => {
-    if (!signer || !showConfirm) {
+    if (!provider || !showConfirm) {
       setShowConfirm(true);
       return;
     }
     setTxPending(true);
     try {
+      const signer = await provider.getSigner();
       const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, signer);
       const tx = metrics.policyEnginePaused ? await pe.unpause() : await pe.pause();
       await tx.wait();

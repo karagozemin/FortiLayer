@@ -3,136 +3,56 @@ import { ethers } from 'ethers';
 import { useWallet } from './useWallet';
 import { DEPLOYED_ADDRESSES, ABIS } from '../utils/contracts';
 
+// ── Helper ─────────────────────────────────────────────────────
+
+function useContract(address: string | undefined, abi: any[]) {
+  const { provider } = useWallet();
+  return useMemo(() => {
+    if (!provider || !address) return null;
+    return new ethers.Contract(address, abi, provider);
+  }, [provider, address, abi]);
+}
+
 // ── Individual contract hooks ──────────────────────────────────
 
 export function usePolicyEngine() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.policyEngine) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.policyEngine,
-      ABIS.PolicyEngine,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine);
 }
 
 export function useTreasuryFirewall() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.treasuryFirewall) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.treasuryFirewall,
-      ABIS.TreasuryFirewall,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall);
 }
 
 export function useTreasury() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.treasury) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.treasury,
-      ABIS.Treasury,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury);
 }
 
 export function useMockUSDC() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.mockUSDC) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.mockUSDC,
-      ABIS.MockUSDC,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC);
 }
 
 export function usePolicyRegistry() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.policyRegistry) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.policyRegistry,
-      ABIS.PolicyRegistry,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.policyRegistry, ABIS.PolicyRegistry);
 }
 
 // ── Policy contract hooks ──────────────────────────────────────
 
 export function useSpendingLimitPolicy() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.spendingLimitPolicy) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.spendingLimitPolicy,
-      ABIS.SpendingLimitPolicy,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy);
 }
 
 export function useWhitelistPolicy() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.whitelistPolicy) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.whitelistPolicy,
-      ABIS.WhitelistPolicy,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy);
 }
 
 export function useTimelockPolicy() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.timelockPolicy) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.timelockPolicy,
-      ABIS.TimelockPolicy,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy);
 }
 
 export function useMultiSigPolicy() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.multiSigPolicy) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.multiSigPolicy,
-      ABIS.MultiSigPolicy,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.multiSigPolicy, ABIS.MultiSigPolicy);
 }
 
 export function useRiskScorePolicy() {
-  const { signer, provider } = useWallet();
-  return useMemo(() => {
-    const signerOrProvider = signer || provider;
-    if (!signerOrProvider || !DEPLOYED_ADDRESSES.riskScorePolicy) return null;
-    return new ethers.Contract(
-      DEPLOYED_ADDRESSES.riskScorePolicy,
-      ABIS.RiskScorePolicy,
-      signerOrProvider
-    );
-  }, [signer, provider]);
+  return useContract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy);
 }

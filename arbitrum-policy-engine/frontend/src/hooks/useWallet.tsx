@@ -1,11 +1,21 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { ethers } from 'ethers';
+import React, { createContext, useContext, useMemo, ReactNode } from 'react';
+import { BrowserProvider } from 'ethers';
+import {
+  useAppKit,
+  useAppKitAccount,
+  useAppKitProvider,
+  useAppKitNetwork,
+  useDisconnect,
+} from '@reown/appkit/react';
+import type { Provider } from '@reown/appkit/react';
+
+// Import to run the createAppKit side-effect
+import '../config/appkit';
 
 // ── Types ──────────────────────────────────────────────────────
 
 interface WalletState {
-  provider: ethers.BrowserProvider | null;
-  signer: ethers.JsonRpcSigner | null;
+  provider: BrowserProvider | null;
   address: string | null;
   chainId: number | null;
   isConnected: boolean;
@@ -20,118 +30,63 @@ interface WalletContextType extends WalletState {
 }
 
 const ARBITRUM_SEPOLIA_CHAIN_ID = 421614;
-const ARBITRUM_SEPOLIA_CONFIG = {
-  chainId: '0x66eee',
-  chainName: 'Arbitrum Sepolia',
-  nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-  rpcUrls: ['https://sepolia-rollup.arbitrum.io/rpc'],
-  blockExplorerUrls: ['https://sepolia.arbiscan.io'],
-};
 
 // ── Context ────────────────────────────────────────────────────
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-const initialState: WalletState = {
-  provider: null,
-  signer: null,
-  address: null,
-  chainId: null,
-  isConnected: false,
-  isConnecting: false,
-  error: null,
-};
-
 // ── Provider ───────────────────────────────────────────────────
 
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [state, setState] = useState<WalletState>(initialState);
+  const { open } = useAppKit();
+  const { address, isConnected, status } = useAppKitAccount();
+  const { walletProvider } = useAppKitProvider<Provider>('eip155');
+  const { chainId, switchNetwork } = useAppKitNetwork();
+  const { disconnect: appKitDisconnect } = useDisconnect();
 
-  const connect = useCallback(async () => {
-    if (typeof window.ethereum === 'undefined') {
-      setState(prev => ({ ...prev, error: 'MetaMask not installed' }));
-      return;
-    }
+  const isConnecting = status === 'connecting' || status === 'reconnecting';
 
-    setState(prev => ({ ...prev, isConnecting: true, error: null }));
-
+  // Build ethers BrowserProvider from the walletProvider
+  const ethersProvider = useMemo(() => {
+    if (!walletProvider || !isConnected) return null;
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      await provider.send('eth_requestAccounts', []);
-      const signer = await provider.getSigner();
-      const address = await signer.getAddress();
-      const network = await provider.getNetwork();
-
-      setState({
-        provider,
-        signer,
-        address,
-        chainId: Number(network.chainId),
-        isConnected: true,
-        isConnecting: false,
-        error: null,
-      });
-    } catch (err: any) {
-      setState(prev => ({
-        ...prev,
-        isConnecting: false,
-        error: err.message || 'Connection failed',
-      }));
+      return new BrowserProvider(walletProvider as any, chainId ? Number(chainId) : undefined);
+    } catch {
+      return null;
     }
-  }, []);
+  }, [walletProvider, isConnected, chainId]);
 
-  const disconnect = useCallback(() => {
-    setState(initialState);
-  }, []);
+  const connect = async () => {
+    await open({ view: 'Connect' });
+  };
 
-  const switchToArbitrumSepolia = useCallback(async () => {
-    if (!window.ethereum) return;
+  const disconnect = () => {
+    appKitDisconnect();
+  };
 
+  const switchToArbitrumSepolia = async () => {
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: ARBITRUM_SEPOLIA_CONFIG.chainId }],
-      });
-    } catch (err: any) {
-      // Chain not added — add it
-      if (err.code === 4902) {
-        await window.ethereum.request({
-          method: 'wallet_addEthereumChain',
-          params: [ARBITRUM_SEPOLIA_CONFIG],
-        });
-      }
+      const { arbitrumSepolia } = await import('@reown/appkit/networks');
+      switchNetwork(arbitrumSepolia);
+    } catch (err) {
+      console.error('Failed to switch network:', err);
     }
-  }, []);
+  };
 
-  // Listen for account / chain changes
-  useEffect(() => {
-    if (!window.ethereum) return;
-
-    const handleAccountsChanged = (accounts: string[]) => {
-      if (accounts.length === 0) {
-        disconnect();
-      } else {
-        setState(prev => ({ ...prev, address: accounts[0] }));
-      }
-    };
-
-    const handleChainChanged = (chainIdHex: string) => {
-      setState(prev => ({ ...prev, chainId: parseInt(chainIdHex, 16) }));
-    };
-
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
-    window.ethereum.on('chainChanged', handleChainChanged);
-
-    return () => {
-      window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
-      window.ethereum?.removeListener('chainChanged', handleChainChanged);
-    };
-  }, [disconnect]);
+  const state: WalletContextType = {
+    provider: ethersProvider,
+    address: address ?? null,
+    chainId: chainId ? Number(chainId) : null,
+    isConnected,
+    isConnecting,
+    error: null,
+    connect,
+    disconnect,
+    switchToArbitrumSepolia,
+  };
 
   return (
-    <WalletContext.Provider
-      value={{ ...state, connect, disconnect, switchToArbitrumSepolia }}
-    >
+    <WalletContext.Provider value={state}>
       {children}
     </WalletContext.Provider>
   );
@@ -145,10 +100,5 @@ export const useWallet = (): WalletContextType => {
   return ctx;
 };
 
-// ── Window type augmentation ──────────────────────────────────
+export { ARBITRUM_SEPOLIA_CHAIN_ID };
 
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}

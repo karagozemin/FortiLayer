@@ -12,6 +12,7 @@ interface ImportMetaEnv {
   readonly VITE_TIMELOCK_POLICY: string;
   readonly VITE_MULTISIG_POLICY: string;
   readonly VITE_RISK_SCORE_POLICY: string;
+  readonly VITE_WALLET_CONNECT_PROJECT_ID: string;
 }
 
 interface ImportMeta {
