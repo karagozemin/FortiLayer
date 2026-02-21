@@ -331,9 +331,11 @@ export function parseContractError(err: any): string {
 }
 
 // ── Gas Override for Arbitrum Sepolia ───────────────────────────
-// Arbitrum Sepolia often needs boosted gas to avoid stuck transactions
+// Arbitrum Sepolia needs boosted gas fees to avoid stuck/failed transactions
 export const GAS_OVERRIDES = {
   gasLimit: 3_000_000n,
+  maxFeePerGas: 100_000_000n,          // 0.1 gwei
+  maxPriorityFeePerGas: 100_000_000n,  // 0.1 gwei
 };
 
 // ── Wait for confirmation and verify success ───────────────────
