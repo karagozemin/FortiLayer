@@ -4,7 +4,7 @@
 
 # FortiLayer
 
-### The Programmable Execution Layer That Institutionalizes Arbitrum
+### The Programmable Execution Firewall for Institutional Arbitrum Treasuries
 
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636?logo=solidity)](https://soliditylang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Stylus%20WASM-orange?logo=rust)](https://docs.arbitrum.io/stylus/gentle-introduction)
@@ -41,9 +41,9 @@ Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk s
 
 ## 🏆 Why FortiLayer Wins
 
-> **Most hackathon projects demonstrate an idea. FortiLayer demonstrates deployable infrastructure.**
+> **FortiLayer goes beyond a demo and ships production-grade infrastructure.**
 
-FortiLayer is the **only project** that combines all of these — shipped, deployed, and verified:
+Everything below is shipped, deployed, and verified — not planned, not mocked:
 
 | What We Ship | Why It Matters |
 |---|---|
@@ -57,6 +57,19 @@ FortiLayer is the **only project** that combines all of these — shipped, deplo
 
 ---
 
+## 🏆 Hackathon Alignment
+
+| Criteria | Evidence |
+|---|---|
+| **Deployed on Arbitrum** | 12 contracts verified on Arbitrum Sepolia — [Arbiscan ↗](https://sepolia.arbiscan.io/address/0x245118Fba999F1ed338174933f83bdD6e08327D9) |
+| **Uses Stylus** | SpendingLimitPolicy written in Rust, compiled to WASM, deployed & cached — [`0xb92da5...`](https://sepolia.arbiscan.io/address/0xb92da51e406b72fddd4cdc03b32ddd2bdeeb1c6e) |
+| **Real oracle integration** | Live Chainlink ETH/USD feed — adaptive risk scoring, not mock data |
+| **Real-world use case** | Institutional treasury protection — $50B+ addressable market |
+| **Technical depth** | 6 composable policies · 140 tests · two-phase atomic validation · 3-layer circuit breaker |
+| **Complete product** | Smart contracts + React dashboard + WalletConnect + pre-flight simulation |
+
+---
+
 ## 🔥 The Problem
 
 > **A DAO can survive a 50% drawdown. It cannot survive a drained treasury.**
@@ -65,9 +78,9 @@ Euler ($197M), Mango ($114M), Ronin ($625M) — none were smart contract bugs. T
 
 Today's tools don't solve this:
 
-| Tool | What It Does | What It Doesn't |
+| Existing Approach | What It Does | What It Doesn't |
 |---|---|---|
-| **Gnosis Safe** | Multi-sig | No per-tx limits, no composable rules, no oracle risk |
+| **Multi-sig wallets** | Require multiple signers | No per-tx limits, no composable rules, no oracle risk |
 | **Timelock controllers** | Delay execution | Single dimension — no spending limits, no whitelists |
 | **Hardcoded limits** | Fixed caps | Can't adapt. No market awareness. No per-vault config |
 
@@ -291,42 +304,16 @@ If **any** policy fails, zero state is written. Off-chain pre-flight simulation 
 
 > **19 Solidity files + 1 Stylus Rust contract · ~2,800 LOC · 12 deployed & verified**
 
-### Core Infrastructure
-
-| Contract | LOC | Purpose | OpenZeppelin |
-|---|---|---|---|
-| **PolicyEngine** | 227 | Central orchestrator — validates txs against vault policies, manages composition | Ownable, Pausable, ReentrancyGuard |
-| **TreasuryFirewall** | 171 | Execution gateway — intercepts, delegates to PolicyEngine, executes if compliant | Ownable, Pausable, ReentrancyGuard, SafeERC20 |
-| **TransactionExecutor** | 100 | Role-based final executor with unique transaction ID generation | AccessControl, ReentrancyGuard, SafeERC20 |
-
-### Treasury & Registry
-
-| Contract | LOC | Purpose | OpenZeppelin |
-|---|---|---|---|
-| **Treasury** | 195 | Institutional vault — deposit, firewall-transfer, emergency pause. 3 roles | AccessControl, Pausable, ReentrancyGuard, SafeERC20 |
-| **PolicyRegistry** | 95 | Global catalog of approved policy implementations | Ownable |
-
-### Policy Modules
-
-| Contract | LOC | Key Feature |
+| Layer | Contracts | Role |
 |---|---|---|
-| **BasePolicy** | 88 | Abstract base — `onlyPolicyEngine` auth, default `recordTransaction` no-op |
-| **SpendingLimitPolicy** | 215 | Daily cumulative + per-tx max. UTC day boundary reset |
-| **WhitelistPolicy** | 220 | Per-vault allowlists. Batch add/remove |
-| **TimelockPolicy** | 177 | Cooldown enforcement. Per-vault configurable |
-| **MultiSigPolicy** | 291 | M-of-N approval. Auto-register signers. Clear on execute |
-| **RiskScorePolicy** | 188 | 0–100 scoring. Configurable threshold. Batch scoring |
-| **OracleRiskScorePolicy** | 295 | **Real Chainlink ETH/USD oracle.** Dual-mode: min(oracle, manual). Volatility bands |
+| **Core** | PolicyEngine · TreasuryFirewall · TransactionExecutor | Orchestration, screening, execution |
+| **Vault** | Treasury · PolicyRegistry | Institutional vault + approved policy catalog |
+| **Policies** | SpendingLimit · Whitelist · Timelock · MultiSig · RiskScore · **OracleRiskScore** | 6 composable enforcement modules |
+| **Stylus** 🦀 | SpendingLimitPolicy (Rust/WASM) | Same logic, 10x cheaper — 11.5 KB deployed |
+| **Interfaces** | IPolicy · IPolicyEngine · ITreasury · ITreasuryFirewall · IChainlinkFeed | Clean abstraction boundaries |
+| **Mocks** | MockUSDC · MockChainlinkFeed | Deterministic testing |
 
-### Stylus Contract (Rust/WASM)
-
-| Contract | Language | Size | Key Feature |
-|---|---|---|---|
-| **SpendingLimitPolicy** | Rust (Stylus SDK v0.10.0) | 11.5 KB WASM | Daily limits + per-tx max. Same logic as Solidity, 10x cheaper |
-
-### Interfaces
-
-`IPolicy` · `IPolicyEngine` · `IPolicyRegistry` · `ITreasury` · `ITreasuryFirewall` · `IChainlinkFeed`
+All contracts use OpenZeppelin v5.1 (Ownable, Pausable, AccessControl, ReentrancyGuard, SafeERC20).
 
 ---
 
@@ -551,20 +538,20 @@ FortiLayer/
 
 ---
 
-## ⚔️ Competitive Edge
+## ⚔️ How FortiLayer Compares
 
-| | Gnosis Safe | Timelock | Others | **FortiLayer** |
-|---|---|---|---|---|
-| Composable policies | ❌ | ❌ | Limited | **✅ 6 modules, AND logic** |
-| Stylus (Rust/WASM) | ❌ | ❌ | ❌ | **✅ Deployed & cached** |
-| Live oracle risk | ❌ | ❌ | ❌ | **✅ Chainlink adaptive** |
-| Pre-flight simulation | ❌ | ❌ | ❌ | **✅ Off-chain validate()** |
-| Per-vault config | Per-safe | Global | Global | **✅ Per-vault policies** |
-| Circuit breaker | ❌ | ❌ | Partial | **✅ 3 independent pauses** |
-| Test coverage | ✅ | Limited | Unknown | **✅ 140 tests** |
-| Verified deploy | ✅ | Varies | Unknown | **✅ 12 on Arbiscan** |
+| Capability | Traditional Multi-sigs | Timelock Solutions | **FortiLayer** |
+|---|---|---|---|
+| Composable policies | ❌ | ❌ | **✅ 6 modules, AND logic** |
+| Stylus (Rust/WASM) | ❌ | ❌ | **✅ Deployed & cached** |
+| Live oracle risk | ❌ | ❌ | **✅ Chainlink adaptive** |
+| Pre-flight simulation | ❌ | ❌ | **✅ Off-chain validate()** |
+| Per-vault config | Per-wallet | Global | **✅ Per-vault policies** |
+| Circuit breaker | ❌ | ❌ | **✅ 3 independent pauses** |
+| Test coverage | Varies | Limited | **✅ 140 tests** |
+| Verified deployment | Varies | Varies | **✅ 12 on Arbiscan** |
 
-> **FortiLayer doesn't compete with multisigs. It replaces the entire execution control paradigm.**
+> **FortiLayer isn't an alternative to multi-sigs. It's the execution control layer that sits above them.**
 
 ---
 
@@ -578,7 +565,7 @@ MIT
 
 **Built for Arbitrum. Powered by Stylus. Secured by Chainlink.** 🔵🦀🔗
 
-*The programmable execution layer that institutionalizes on-chain capital.*
+*Programmable execution control for institutional on-chain capital.*
 
 [Live Demo](https://fortilayer.vercel.app) · [Arbiscan](https://sepolia.arbiscan.io/address/0x245118Fba999F1ed338174933f83bdD6e08327D9) · [GitHub](https://github.com/karagozemin/FortiLayer)
 
