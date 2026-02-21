@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError } from '../utils/contracts';
 import { IconRefresh, IconExternalLink, IconPlus, IconTrash, IconChevronDown } from './Icons';
 import { useToast } from './Toast';
 
@@ -160,11 +160,26 @@ const PolicyManager: React.FC = () => {
 
   useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
 
+  // ── Pre-check: verify signer is the policy owner ──────────────
+  const checkOwner = async (contractAddr: string, abi: any[], label: string): Promise<boolean> => {
+    if (!provider) return false;
+    const signer = await provider.getSigner();
+    const signerAddr = await signer.getAddress();
+    const c = new ethers.Contract(contractAddr, abi, provider);
+    const ownerAddr: string = await c.owner();
+    if (ownerAddr.toLowerCase() !== signerAddr.toLowerCase()) {
+      toast('error', `Your wallet is not the owner of ${label}. Only the deployer (${shortenAddress(ownerAddr)}) can configure this policy.`);
+      return false;
+    }
+    return true;
+  };
+
   // ── Action Handlers ──────────────
   const handleAddWhitelist = async () => {
     if (!provider || !wlAddr) return;
     setTxPending('wl-add');
     try {
+      if (!await checkOwner(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, 'WhitelistPolicy')) { setTxPending(''); return; }
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, signer);
       toast('pending', 'Adding to whitelist…');
@@ -174,7 +189,7 @@ const PolicyManager: React.FC = () => {
       setWlAddr('');
       await fetchPolicies();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || 'Failed to add');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
@@ -182,6 +197,15 @@ const PolicyManager: React.FC = () => {
     if (!provider) return;
     setTxPending('wl-remove');
     try {
+      if (!await checkOwner(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, 'WhitelistPolicy')) { setTxPending(''); return; }
+      // Pre-check: verify the address is actually whitelisted
+      const wlRead = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, provider);
+      const isWL = await wlRead.isWhitelisted(DEPLOYED_ADDRESSES.treasury, addr);
+      if (!isWL) {
+        toast('error', `${shortenAddress(addr)} is not currently whitelisted`);
+        setTxPending('');
+        return;
+      }
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, signer);
       toast('pending', 'Removing from whitelist…');
@@ -191,7 +215,7 @@ const PolicyManager: React.FC = () => {
       setWlRemoveAddr('');
       await fetchPolicies();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || 'Failed to remove');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
@@ -199,6 +223,7 @@ const PolicyManager: React.FC = () => {
     if (!provider || !slDailyLimit) return;
     setTxPending('sl-daily');
     try {
+      if (!await checkOwner(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, 'SpendingLimitPolicy')) { setTxPending(''); return; }
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, signer);
       const amt = ethers.parseUnits(slDailyLimit, 6);
@@ -209,7 +234,7 @@ const PolicyManager: React.FC = () => {
       setSlDailyLimit('');
       await fetchPolicies();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || 'Failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
@@ -217,6 +242,7 @@ const PolicyManager: React.FC = () => {
     if (!provider || !slMaxTx) return;
     setTxPending('sl-max');
     try {
+      if (!await checkOwner(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, 'SpendingLimitPolicy')) { setTxPending(''); return; }
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, signer);
       const amt = ethers.parseUnits(slMaxTx, 6);
@@ -227,14 +253,19 @@ const PolicyManager: React.FC = () => {
       setSlMaxTx('');
       await fetchPolicies();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || 'Failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
   const handleSetRiskScore = async () => {
     if (!provider || !rsAddr || !rsScore) return;
+    if (Number(rsScore) > 100 || Number(rsScore) < 0) {
+      toast('error', 'Risk score must be between 0 and 100');
+      return;
+    }
     setTxPending('rs-score');
     try {
+      if (!await checkOwner(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, 'RiskScorePolicy')) { setTxPending(''); return; }
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, signer);
       toast('pending', 'Setting risk score…');
@@ -245,14 +276,19 @@ const PolicyManager: React.FC = () => {
       setRsScore('');
       await fetchPolicies();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || 'Failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
   const handleSetThreshold = async () => {
     if (!provider || !rsThreshold) return;
+    if (Number(rsThreshold) > 100 || Number(rsThreshold) < 0) {
+      toast('error', 'Threshold must be between 0 and 100');
+      return;
+    }
     setTxPending('rs-thresh');
     try {
+      if (!await checkOwner(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, 'RiskScorePolicy')) { setTxPending(''); return; }
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, signer);
       toast('pending', 'Setting min threshold…');
@@ -262,7 +298,7 @@ const PolicyManager: React.FC = () => {
       setRsThreshold('');
       await fetchPolicies();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || 'Failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
@@ -270,6 +306,7 @@ const PolicyManager: React.FC = () => {
     if (!provider || !tlDuration) return;
     setTxPending('tl-dur');
     try {
+      if (!await checkOwner(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy, 'TimelockPolicy')) { setTxPending(''); return; }
       const signer = await provider.getSigner();
       const c = new ethers.Contract(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy, signer);
       toast('pending', 'Setting timelock duration…');
@@ -279,7 +316,7 @@ const PolicyManager: React.FC = () => {
       setTlDuration('');
       await fetchPolicies();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || 'Failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 

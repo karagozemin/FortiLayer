@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp, getExplorerUrl } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp, getExplorerUrl, parseContractError } from '../utils/contracts';
 import { IconRefresh, IconTreasury, IconShield, IconPolicy, IconActivity, IconExternalLink, IconSend, IconChevronDown, IconDownload } from './Icons';
 import { useToast } from './Toast';
 
@@ -126,7 +126,7 @@ const Dashboard: React.FC = () => {
       setMintAmount('');
       await fetchData();
     } catch (err: any) {
-      const msg = err?.reason || err?.shortMessage || err?.message || 'Mint failed';
+      const msg = parseContractError(err);
       toast('error', msg);
       setLastTxResult({ type: 'error', msg });
     } finally { setTxPending(''); }
@@ -157,7 +157,7 @@ const Dashboard: React.FC = () => {
       setDepositAmount('');
       await fetchData();
     } catch (err: any) {
-      const msg = err?.reason || err?.shortMessage || err?.message || 'Deposit failed';
+      const msg = parseContractError(err);
       toast('error', msg);
       setLastTxResult({ type: 'error', msg });
     } finally { setTxPending(''); }
@@ -169,7 +169,20 @@ const Dashboard: React.FC = () => {
     setLastTxResult(null);
     try {
       const signer = await provider.getSigner();
+      const signerAddr = await signer.getAddress();
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
+
+      // Pre-check: does the connected wallet have EXECUTOR_ROLE?
+      const executorRole = await treasury.EXECUTOR_ROLE();
+      const hasRole = await treasury.hasRole(executorRole, signerAddr);
+      if (!hasRole) {
+        const msg = 'Your wallet does not have EXECUTOR_ROLE on the Treasury. Only the deployer can request transfers.';
+        toast('error', msg);
+        setLastTxResult({ type: 'error', msg });
+        setTxPending('');
+        return;
+      }
+
       const amt = ethers.parseUnits(sendAmount, 6);
 
       toast('pending', 'Requesting transfer through firewall…');
@@ -195,7 +208,7 @@ const Dashboard: React.FC = () => {
       setSendAmount('');
       await fetchData();
     } catch (err: any) {
-      const msg = err?.reason || err?.shortMessage || err?.message || 'Transfer failed';
+      const msg = parseContractError(err);
       toast('error', msg);
       setLastTxResult({ type: 'error', msg });
     } finally { setTxPending(''); }

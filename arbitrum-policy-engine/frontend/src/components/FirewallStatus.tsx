@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError } from '../utils/contracts';
 import {
   IconRefresh, IconExternalLink, IconShield, IconEngine,
   IconTreasury, IconArrowRight, IconPolicy, IconCheck,
@@ -29,26 +29,26 @@ const FirewallStatus: React.FC = () => {
       const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, provider);
 
-      const [screened, passed, blocked, fwPaused, fwOwner, peAddr, pePaused, peOwnerAddr, tPaused, tOwnerResult, vaultAuth, policies] = await Promise.all([
+      const userAddr = address?.toLowerCase() || '';
+
+      const [screened, passed, blocked, fwPaused, fwOwner, peAddr, pePaused, peOwnerAddr, tPaused, tHasAdmin, vaultAuth, policies] = await Promise.all([
         fw.totalScreened(), fw.totalPassed(), fw.totalBlocked(),
         fw.paused(), fw.owner(), fw.policyEngine(),
         pe.paused(), pe.owner(),
         treasury.paused(),
-        provider.getCode(DEPLOYED_ADDRESSES.treasury).then(async () => {
-          const t = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ['function owner() view returns (address)'], provider);
-          return t.owner().catch(() => ethers.ZeroAddress);
-        }),
+        userAddr
+          ? treasury.hasRole(await treasury.DEFAULT_ADMIN_ROLE(), userAddr).catch(() => false)
+          : Promise.resolve(false),
         fw.isVaultAuthorized(DEPLOYED_ADDRESSES.treasury),
         pe.getVaultPolicies(DEPLOYED_ADDRESSES.treasury).catch(() => []),
       ]);
 
-      const userAddr = address?.toLowerCase() || '';
       setM({
         totalScreened: Number(screened), totalPassed: Number(passed), totalBlocked: Number(blocked),
         isPaused: fwPaused, isOwner: userAddr ? fwOwner.toLowerCase() === userAddr : false,
         peAddr, pePaused, tPaused, vaultAuth, policyCount: policies.length,
         peOwner: userAddr ? peOwnerAddr.toLowerCase() === userAddr : false,
-        tOwner: userAddr ? (typeof tOwnerResult === 'string' ? tOwnerResult.toLowerCase() === userAddr : false) : false,
+        tOwner: !!tHasAdmin,
       });
     } catch (err) {
       console.error('FirewallStatus error:', err);
@@ -65,6 +65,12 @@ const FirewallStatus: React.FC = () => {
     setTxPending('pe');
     try {
       const signer = await provider.getSigner();
+      const signerAddr = await signer.getAddress();
+      const peRead = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
+      const ownerAddr = await peRead.owner();
+      if (ownerAddr.toLowerCase() !== signerAddr.toLowerCase()) {
+        throw new Error('You are not the owner of the PolicyEngine contract.');
+      }
       const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, signer);
       const action = m.pePaused ? 'unpause' : 'pause';
       toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} PolicyEngine…`);
@@ -74,7 +80,7 @@ const FirewallStatus: React.FC = () => {
       setShowConfirm(null);
       await fetchMetrics();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || err?.message || 'Transaction failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
@@ -84,6 +90,12 @@ const FirewallStatus: React.FC = () => {
     setTxPending('fw');
     try {
       const signer = await provider.getSigner();
+      const signerAddr = await signer.getAddress();
+      const fwRead = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, provider);
+      const ownerAddr = await fwRead.owner();
+      if (ownerAddr.toLowerCase() !== signerAddr.toLowerCase()) {
+        throw new Error('You are not the owner of the TreasuryFirewall contract.');
+      }
       const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, signer);
       const action = m.isPaused ? 'unpause' : 'pause';
       toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} Firewall…`);
@@ -93,7 +105,7 @@ const FirewallStatus: React.FC = () => {
       setShowConfirm(null);
       await fetchMetrics();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || err?.message || 'Transaction failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 
@@ -103,6 +115,17 @@ const FirewallStatus: React.FC = () => {
     setTxPending('treasury');
     try {
       const signer = await provider.getSigner();
+      const signerAddr = await signer.getAddress();
+      const treasuryRead = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, provider);
+      // Treasury uses AccessControl: emergencyPause needs PAUSER_ROLE, emergencyUnpause needs ADMIN_ROLE
+      const requiredRole = m.tPaused
+        ? await treasuryRead.ADMIN_ROLE()
+        : await treasuryRead.PAUSER_ROLE();
+      const hasRole = await treasuryRead.hasRole(requiredRole, signerAddr);
+      if (!hasRole) {
+        const roleName = m.tPaused ? 'ADMIN_ROLE' : 'PAUSER_ROLE';
+        throw new Error(`You do not have the ${roleName} on the Treasury contract.`);
+      }
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
       const action = m.tPaused ? 'emergencyUnpause' : 'emergencyPause';
       toast('pending', `${m.tPaused ? 'Unpausing' : 'Pausing'} Treasury…`);
@@ -112,7 +135,7 @@ const FirewallStatus: React.FC = () => {
       setShowConfirm(null);
       await fetchMetrics();
     } catch (err: any) {
-      toast('error', err?.reason || err?.shortMessage || err?.message || 'Transaction failed');
+      toast('error', parseContractError(err));
     } finally { setTxPending(''); }
   };
 

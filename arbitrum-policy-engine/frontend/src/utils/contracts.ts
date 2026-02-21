@@ -42,6 +42,18 @@ export const ABIS = {
     'event PolicyRemoved(address indexed vault, address indexed policy)',
     'event TransactionValidated(address indexed vault, address indexed token, address indexed to, uint256 amount)',
     'event TransactionRejected(address indexed vault, address indexed token, address to, uint256 amount, address failedPolicy)',
+    // Custom errors
+    'error ZeroAddress()',
+    'error PolicyAlreadyRegistered(address vault, address policy)',
+    'error PolicyNotRegistered(address vault, address policy)',
+    'error TransactionNotCompliant(address vault, address failedPolicy)',
+    'error NotVaultOwner(address caller, address vault)',
+    'error VaultAlreadyRegistered(address vault)',
+    'error VaultNotRegistered(address vault)',
+    'error OwnableUnauthorizedAccount(address account)',
+    'error OwnableInvalidOwner(address owner)',
+    'error EnforcedPause()',
+    'error ExpectedPause()',
   ],
 
   TreasuryFirewall: [
@@ -61,6 +73,14 @@ export const ABIS = {
     'event TransactionScreened(address indexed vault, address indexed token, address indexed to, uint256 amount, bool passed)',
     'event VaultAuthorized(address indexed vault)',
     'event VaultRevoked(address indexed vault)',
+    // Custom errors
+    'error ZeroAddress()',
+    'error TransactionBlocked(address vault, address token, address to, uint256 amount)',
+    'error VaultNotAuthorized(address vault)',
+    'error OwnableUnauthorizedAccount(address account)',
+    'error OwnableInvalidOwner(address owner)',
+    'error EnforcedPause()',
+    'error ExpectedPause()',
   ],
 
   Treasury: [
@@ -74,11 +94,28 @@ export const ABIS = {
     'function emergencyUnpause()',
     'function emergencyWithdraw(address token, address to, uint256 amount)',
     'function setFirewall(address _firewall)',
+    // AccessControl role functions
+    'function hasRole(bytes32 role, address account) view returns (bool)',
+    'function getRoleAdmin(bytes32 role) view returns (bytes32)',
+    'function ADMIN_ROLE() view returns (bytes32)',
+    'function EXECUTOR_ROLE() view returns (bytes32)',
+    'function PAUSER_ROLE() view returns (bytes32)',
+    'function DEFAULT_ADMIN_ROLE() view returns (bytes32)',
     'event Deposited(address indexed token, address indexed from, uint256 amount)',
     'event TransferRequested(bytes32 indexed txId, address indexed token, address indexed to, uint256 amount, address requestedBy)',
     'event TransferExecuted(bytes32 indexed txId, address indexed token, address indexed to, uint256 amount)',
     'event EmergencyPaused(address indexed by)',
     'event EmergencyUnpaused(address indexed by)',
+    // Custom errors
+    'error ZeroAddress()',
+    'error ZeroAmount()',
+    'error InsufficientBalance(address token, uint256 requested, uint256 available)',
+    'error TransferFailed(address token, address to, uint256 amount)',
+    'error Unauthorized(address caller)',
+    'error AccessControlUnauthorizedAccount(address account, bytes32 neededRole)',
+    'error AccessControlBadConfirmation()',
+    'error EnforcedPause()',
+    'error ExpectedPause()',
   ],
 
   PolicyRegistry: [
@@ -119,6 +156,13 @@ export const ABIS = {
     'function setDefaultMaxTxAmount(uint256 maxAmount)',
     'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
     'function owner() view returns (address)',
+    // Custom errors
+    'error OnlyOwner()',
+    'error OnlyPolicyEngine()',
+    'error ZeroAddress()',
+    'error ExceedsMaxTransactionAmount(uint256 amount, uint256 maxAmount)',
+    'error ExceedsDailyLimit(uint256 currentSpent, uint256 amount, uint256 dailyLimit)',
+    'error InvalidLimit()',
   ],
 
   WhitelistPolicy: [
@@ -133,6 +177,14 @@ export const ABIS = {
     'function removeFromGlobalWhitelist(address recipient)',
     'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
     'function owner() view returns (address)',
+    // Custom errors
+    'error OnlyOwner()',
+    'error OnlyPolicyEngine()',
+    'error ZeroAddress()',
+    'error RecipientNotWhitelisted(address vault, address recipient)',
+    'error AlreadyWhitelisted(address recipient)',
+    'error NotWhitelisted(address recipient)',
+    'error EmptyArray()',
   ],
 
   TimelockPolicy: [
@@ -148,6 +200,12 @@ export const ABIS = {
     'function resetTimelock(address vault)',
     'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
     'function owner() view returns (address)',
+    // Custom errors
+    'error OnlyOwner()',
+    'error OnlyPolicyEngine()',
+    'error ZeroAddress()',
+    'error TimelockActive(address vault, uint256 unlockTime, uint256 currentTime)',
+    'error InvalidDuration()',
   ],
 
   MultiSigPolicy: [
@@ -167,6 +225,16 @@ export const ABIS = {
     'function setRequiredApprovals(uint256 _requiredApprovals)',
     'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
     'function owner() view returns (address)',
+    // Custom errors
+    'error OnlyOwner()',
+    'error OnlyPolicyEngine()',
+    'error ZeroAddress()',
+    'error NotASigner(address account)',
+    'error AlreadySigner(address account)',
+    'error AlreadyApproved(bytes32 txHash, address signer)',
+    'error NotApproved(bytes32 txHash, address signer)',
+    'error InsufficientApprovals(bytes32 txHash, uint256 current, uint256 required)',
+    'error InvalidRequiredApprovals(uint256 required)',
   ],
 
   RiskScorePolicy: [
@@ -183,6 +251,13 @@ export const ABIS = {
     'function setDefaultScore(uint256 _defaultScore)',
     'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
     'function owner() view returns (address)',
+    // Custom errors
+    'error OnlyOwner()',
+    'error OnlyPolicyEngine()',
+    'error ZeroAddress()',
+    'error RiskScoreTooLow(address recipient, uint256 score, uint256 threshold)',
+    'error InvalidScore(uint256 score)',
+    'error InvalidThreshold(uint256 threshold)',
   ],
 };
 
@@ -218,4 +293,39 @@ export function getExplorerUrl(txHash: string): string {
 
 export function getAddressExplorerUrl(address: string): string {
   return `https://sepolia.arbiscan.io/address/${address}`;
+}
+
+/**
+ * Extract a human-readable error message from a contract revert.
+ * Handles custom Solidity errors, ethers.js error wrapping, and raw strings.
+ */
+export function parseContractError(err: any): string {
+  // ethers.js v6 wraps the reason
+  if (err?.reason) return err.reason;
+  if (err?.shortMessage) {
+    // ethers shortMessage often contains the decoded custom error
+    const sm = err.shortMessage as string;
+    // Strip 'execution reverted' prefix for cleaner display
+    if (sm.includes('execution reverted')) {
+      // Check for nested error info
+      const info = err?.info?.error?.message || err?.error?.message;
+      if (info) return info;
+      // Check for revert data that ethers decoded
+      const revertData = err?.data;
+      if (revertData && revertData !== '0x') {
+        return sm;
+      }
+      return sm.replace('execution reverted: ', '').replace('execution reverted', 'Transaction reverted');
+    }
+    return sm;
+  }
+  // Metamask / wallet-level errors
+  if (err?.message) {
+    const m = err.message as string;
+    if (m.includes('user rejected')) return 'Transaction rejected by user';
+    if (m.includes('insufficient funds')) return 'Insufficient ETH for gas fees';
+    if (m.length > 120) return m.slice(0, 120) + '…';
+    return m;
+  }
+  return 'Transaction failed';
 }
