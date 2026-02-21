@@ -54,8 +54,17 @@ button { cursor: pointer; font-family: inherit }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-hover) }
 
+/* ── DarkVeil Background ──────────────────────────────────── */
+.veil-fixed {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
 /* ── Layout ───────────────────────────────────────────────── */
-.layout { display: flex; min-height: 100vh }
+.layout { display: flex; min-height: 100vh; position: relative; z-index: 1 }
 
 .sidebar {
   width: 240px;
@@ -138,12 +147,12 @@ button { cursor: pointer; font-family: inherit }
 }
 
 /* ── Main ─────────────────────────────────────────────────── */
-.main { margin-left: 240px; flex: 1; min-height: 100vh }
+.main { margin-left: 240px; flex: 1; min-height: 100vh; position: relative; z-index: 1 }
 
 .topbar {
   height: 56px; padding: 0 32px;
   display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid var(--border); background: rgba(12,18,33,.85);
+  border-bottom: 1px solid var(--border); background: rgba(12,18,33,.95);
   backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
   position: sticky; top: 0; z-index: 40;
 }
@@ -365,6 +374,17 @@ button { cursor: pointer; font-family: inherit }
 .welcome {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-height: calc(100vh - 56px); gap: 20px; text-align: center; padding: 32px;
+  position: relative; overflow: hidden;
+}
+
+.welcome-bg {
+  position: absolute; inset: 0; z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.welcome > *:not(.welcome-bg) {
+  position: relative; z-index: 1;
 }
 
 .welcome-logo {

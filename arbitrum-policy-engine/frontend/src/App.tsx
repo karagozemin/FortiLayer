@@ -3,6 +3,7 @@ import Dashboard from './components/Dashboard';
 import PolicyManager from './components/PolicyManager';
 import TransactionQueue from './components/TransactionQueue';
 import FirewallStatus from './components/FirewallStatus';
+import DarkVeil from './components/DarkVeil';
 import { ToastProvider } from './components/Toast';
 import { WalletProvider, useWallet, ARBITRUM_SEPOLIA_CHAIN_ID } from './hooks/useWallet';
 import {
@@ -95,6 +96,18 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="layout">
+      <div className="veil-fixed">
+        <DarkVeil
+          hueShift={0}
+          noiseIntensity={0.02}
+          scanlineIntensity={0.03}
+          speed={1}
+          scanlineFrequency={1.2}
+          warpAmount={0.25}
+          resolutionScale={0.5}
+        />
+      </div>
+
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-brand">
