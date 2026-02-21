@@ -101,7 +101,7 @@ const AppContent: React.FC = () => {
           hueShift={0}
           noiseIntensity={0.02}
           scanlineIntensity={0.03}
-          speed={1}
+          speed={2}
           scanlineFrequency={1.2}
           warpAmount={0.25}
           resolutionScale={0.5}
