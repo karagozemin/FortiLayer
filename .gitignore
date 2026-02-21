@@ -6,6 +6,7 @@ arbitrum-policy-engine/artifacts/
 arbitrum-policy-engine/cache/
 arbitrum-policy-engine/typechain-types/
 arbitrum-policy-engine/frontend/dist/
+stylus-policies/target/
 
 # Environment
 .env
