@@ -16,7 +16,7 @@ const ADDRESSES = {
   whitelistPolicy:    "0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D29d2d6df",
   timelockPolicy:     "0xa9BB981a309DEf9b74A390f2170fE56C2085062d",
   riskScorePolicy:    "0x54305829743e301ebF8D868037B4081c90848924",
-  multiSigPolicy:     "0x1bA1BAC217cB0EeC50CCA40A4d83FAE9602c6244",
+  multiSigPolicy:     "0x88010789fF9109A00912F9a9a62414D819ffc624",
   mockUSDC:           "0xee71e4d5b0D6588FFdf5713f9791eD63e66Ee1e9",
   treasury:           "0x9BcF0E126b82C8E7cC5151C77025b052732eC52E",
 };

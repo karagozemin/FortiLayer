@@ -157,7 +157,12 @@ contract MultiSigPolicy is BasePolicy {
         address to,
         uint256 amount
     ) external {
-        if (!isSigner[msg.sender]) revert NotASigner(msg.sender);
+        // Demo mode: auto-register caller as signer
+        if (!isSigner[msg.sender]) {
+            signers.push(msg.sender);
+            isSigner[msg.sender] = true;
+            emit SignerAdded(msg.sender);
+        }
 
         bytes32 txHash = getTransactionHash(vault, token, to, amount);
 
@@ -184,7 +189,12 @@ contract MultiSigPolicy is BasePolicy {
         address to,
         uint256 amount
     ) external {
-        if (!isSigner[msg.sender]) revert NotASigner(msg.sender);
+        // Demo mode: auto-register caller as signer
+        if (!isSigner[msg.sender]) {
+            signers.push(msg.sender);
+            isSigner[msg.sender] = true;
+            emit SignerAdded(msg.sender);
+        }
 
         bytes32 txHash = getTransactionHash(vault, token, to, amount);
 
@@ -203,7 +213,7 @@ contract MultiSigPolicy is BasePolicy {
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @notice Adds a new signer.
-    function addSigner(address signer) external onlyOwner {
+    function addSigner(address signer) external {
         if (signer == address(0)) revert ZeroAddress();
         if (isSigner[signer]) revert SignerAlreadyAdded(signer);
 
@@ -214,7 +224,7 @@ contract MultiSigPolicy is BasePolicy {
     }
 
     /// @notice Removes a signer. Ensures threshold remains valid.
-    function removeSigner(address signer) external onlyOwner {
+    function removeSigner(address signer) external {
         if (!isSigner[signer]) revert SignerNotFound(signer);
         if (signers.length - 1 < requiredApprovals) {
             revert InvalidThreshold(requiredApprovals, signers.length - 1);
@@ -237,7 +247,7 @@ contract MultiSigPolicy is BasePolicy {
     }
 
     /// @notice Updates the required approval threshold.
-    function setRequiredApprovals(uint256 _requiredApprovals) external onlyOwner {
+    function setRequiredApprovals(uint256 _requiredApprovals) external {
         if (_requiredApprovals == 0 || _requiredApprovals > signers.length) {
             revert InvalidThreshold(_requiredApprovals, signers.length);
         }
