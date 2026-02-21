@@ -6,6 +6,8 @@
 
 ### The Programmable Execution Firewall for Institutional Arbitrum Treasuries
 
+> *The first programmable policy layer built natively for Arbitrum Stylus.*
+
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636?logo=solidity)](https://soliditylang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Stylus%20WASM-orange?logo=rust)](https://docs.arbitrum.io/stylus/gentle-introduction)
 [![Arbitrum](https://img.shields.io/badge/Arbitrum-Sepolia-blue?logo=arbitrum)](https://arbitrum.io/)
@@ -54,7 +56,7 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | **Live Chainlink oracle** 🔗 | Market stress → automatic permission tightening. Adaptive, not static. |
 | **Two-phase atomic validation** | validate() → record(). Zero state pollution on failure. Off-chain simulation. |
 | **3-layer circuit breaker** | Any single pause freezes everything. Three independent kill switches. |
-| **140 tests · 12 verified contracts** | Not a demo — auditable, verifiable, institutional-grade. |
+| **140 tests · 12 verified contracts · Stylus WASM deployed** | Production-grade, verifiable, not theoretical. |
 | **Full React dashboard** | WalletConnect + pre-flight simulation + 4 pages. Users see errors before spending gas. |
 
 ---
@@ -98,6 +100,7 @@ FortiLayer is not just a treasury tool — it is **ecosystem infrastructure**.
 - **Makes Orbit chains institution-ready** by default — embed FortiLayer as a native compliance layer
 - **Positions Arbitrum as the compliance-ready L2** — the chain where institutions *want* to build
 - **Showcases Stylus** as a real production tool — not just a demo feature
+- **Demonstrates real Stylus adoption** beyond toy examples — production policy logic running in WASM
 
 > Scalable execution is not enough. **Controlled execution is the next layer.** FortiLayer builds it on Arbitrum.
 
@@ -108,6 +111,8 @@ FortiLayer is not just a treasury tool — it is **ecosystem infrastructure**.
 > **A DAO can survive a 50% drawdown. It cannot survive a drained treasury.**
 
 Euler ($197M), Mango ($114M), Ronin ($625M) — none were smart contract bugs. They were **execution control failures**: unauthorized access, no spending limits, missing cooldowns.
+
+**These were not contract bugs. They were missing execution controls.**
 
 Today's tools don't solve this:
 
@@ -167,6 +172,7 @@ FortiLayer was designed against real-world treasury attack vectors. Every scenar
 | 6 | **Cumulative drain** | Many small txs that individually pass limits | ❌ **BLOCKED** — daily cumulative limit exceeded | SpendingLimitPolicy |
 | 7 | **Emergency exploit** | Active attack detected | 🛑 **HALTED** — emergency pause freezes all operations | Circuit Breaker (3-layer) |
 | 8 | **Policy bypass attempt** | Direct token transfer bypassing firewall | ❌ **IMPOSSIBLE** — tokens held by Treasury, only firewall can execute | Architecture |
+| 9 | **Governance misconfiguration** | Admin sets weak policy accidentally | ❌ **BLOCKED** — policy changes require owner role + multi-sig approval | Access Control |
 
 > **Every known treasury attack vector is covered by at least one policy. Most are covered by multiple overlapping layers.**
 
@@ -193,6 +199,8 @@ The SpendingLimitPolicy is the **most frequently called policy** — every singl
 | Solidity `validate()` | ~42,000 gas |
 | Stylus `validate()` | ~4,800 gas |
 | **Improvement** | **~8–9x on hottest execution path** |
+
+Stylus allows us to keep the **same policy logic** while drastically reducing execution cost on the most frequently called path.
 
 **Why this matters for judges:** Stylus is Arbitrum's flagship technology. FortiLayer doesn't just *mention* Stylus — we shipped a **production contract** in Rust that handles the hottest path in the entire system. Same logic, same tests, 8–9x better economics.
 
@@ -227,6 +235,8 @@ The OracleRiskScorePolicy doesn't just check static scores — it reads **live C
 | > 10% (market stress) | **10** | Near-total lockdown — only critical ops pass |
 
 **Dual-mode scoring:** Uses `min(oracleScore, manualScore)` — the more conservative score always wins. If oracle data goes stale, gracefully falls back to manual mode. No single point of failure.
+
+**No oracle dependency can freeze treasury operations.** Stale data → manual fallback. Always operational.
 
 **Live feed:** [`0xd30e2101...`](https://sepolia.arbiscan.io/address/0xd30e2101a97dcbAeBCBC04F14C3f624E67A35165) (Chainlink ETH/USD on Arbitrum Sepolia)
 
@@ -558,6 +568,7 @@ FortiLayer/
 - [ ] **Policy marketplace** — Deploy, share, and monetize custom policy modules
 - [ ] **Cross-chain support** — Arbitrum ↔ Ethereum ↔ Optimism treasury bridging with policy enforcement
 - [ ] **Formal verification** — Certora/Halmos proofs for core invariants
+- [ ] **Native Orbit chain template** — Orbit L3 with FortiLayer pre-installed as default compliance layer
 - [ ] **Arbitrum mainnet deployment**
 
 > **FortiLayer is infrastructure, not a hackathon project. It ships and keeps shipping.**
@@ -566,7 +577,7 @@ FortiLayer/
 
 ## 💰 Business Model
 
-**Infrastructure-as-a-service** for institutional on-chain capital:
+**Positioning: "AWS WAF for On-Chain Capital"** — infrastructure-as-a-service for institutional treasuries:
 
 | Revenue | Model |
 |---|---|
@@ -594,6 +605,16 @@ FortiLayer/
 | Verified deployment | Varies | Varies | **✅ 12 on Arbiscan** |
 
 > **FortiLayer isn't an alternative to multi-sigs. It's the execution control layer that sits above them.**
+
+---
+
+## 🧠 Built With Intent
+
+FortiLayer was not built to win a hackathon.
+
+It was built to solve a **structural flaw** in how on-chain capital is protected.
+
+The hackathon was simply the catalyst.
 
 ---
 
