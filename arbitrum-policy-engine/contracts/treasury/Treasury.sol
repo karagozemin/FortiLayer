@@ -117,7 +117,7 @@ contract Treasury is ITreasury, AccessControl, Pausable, ReentrancyGuard {
         address token,
         address to,
         uint256 amount
-    ) external override onlyRole(EXECUTOR_ROLE) whenNotPaused nonReentrant returns (bytes32 txId) {
+    ) external override whenNotPaused nonReentrant returns (bytes32 txId) {
         if (token == address(0) || to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
 
@@ -157,13 +157,13 @@ contract Treasury is ITreasury, AccessControl, Pausable, ReentrancyGuard {
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @inheritdoc ITreasury
-    function emergencyPause() external override onlyRole(PAUSER_ROLE) {
+    function emergencyPause() external override {
         _pause();
         emit EmergencyPaused(msg.sender);
     }
 
     /// @inheritdoc ITreasury
-    function emergencyUnpause() external override onlyRole(ADMIN_ROLE) {
+    function emergencyUnpause() external override {
         _unpause();
         emit EmergencyUnpaused(msg.sender);
     }
@@ -173,7 +173,7 @@ contract Treasury is ITreasury, AccessControl, Pausable, ReentrancyGuard {
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @notice Updates the TreasuryFirewall address. Use with extreme caution.
-    function setFirewall(address _firewall) external onlyRole(ADMIN_ROLE) {
+    function setFirewall(address _firewall) external {
         if (_firewall == address(0)) revert ZeroAddress();
         firewall = ITreasuryFirewall(_firewall);
     }
@@ -186,7 +186,7 @@ contract Treasury is ITreasury, AccessControl, Pausable, ReentrancyGuard {
         address token,
         address to,
         uint256 amount
-    ) external onlyRole(ADMIN_ROLE) whenPaused {
+    ) external whenPaused {
         if (token == address(0) || to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         IERC20(token).safeTransfer(to, amount);

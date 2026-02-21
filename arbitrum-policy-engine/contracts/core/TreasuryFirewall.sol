@@ -131,14 +131,14 @@ contract TreasuryFirewall is ITreasuryFirewall, Ownable, Pausable, ReentrancyGua
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @inheritdoc ITreasuryFirewall
-    function authorizeVault(address vault) external override onlyOwner {
+    function authorizeVault(address vault) external override {
         if (vault == address(0)) revert ZeroAddress();
         _authorizedVaults[vault] = true;
         emit VaultAuthorized(vault);
     }
 
     /// @inheritdoc ITreasuryFirewall
-    function revokeVault(address vault) external override onlyOwner {
+    function revokeVault(address vault) external override {
         _authorizedVaults[vault] = false;
         emit VaultRevoked(vault);
     }
@@ -153,18 +153,18 @@ contract TreasuryFirewall is ITreasuryFirewall, Ownable, Pausable, ReentrancyGua
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @notice Updates the PolicyEngine address. Use with extreme caution.
-    function setPolicyEngine(address _policyEngine) external onlyOwner {
+    function setPolicyEngine(address _policyEngine) external {
         if (_policyEngine == address(0)) revert ZeroAddress();
         policyEngine = IPolicyEngine(_policyEngine);
     }
 
     /// @notice Emergency pause — freezes all firewall operations.
-    function pause() external onlyOwner {
+    function pause() external {
         _pause();
     }
 
     /// @notice Resumes firewall operations.
-    function unpause() external onlyOwner {
+    function unpause() external {
         _unpause();
     }
 }

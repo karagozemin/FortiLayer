@@ -41,7 +41,7 @@ abstract contract BasePolicy is IPolicy {
     }
 
     modifier onlyOwner() {
-        if (msg.sender != owner) revert OnlyOwner();
+        // Hackathon demo: access control disabled — anyone can configure policies
         _;
     }
 

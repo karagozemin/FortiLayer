@@ -169,19 +169,7 @@ const Dashboard: React.FC = () => {
     setLastTxResult(null);
     try {
       const signer = await provider.getSigner();
-      const signerAddr = await signer.getAddress();
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
-
-      // Pre-check: does the connected wallet have EXECUTOR_ROLE?
-      const executorRole = await treasury.EXECUTOR_ROLE();
-      const hasRole = await treasury.hasRole(executorRole, signerAddr);
-      if (!hasRole) {
-        const msg = 'Your wallet does not have EXECUTOR_ROLE on the Treasury. Only the deployer can request transfers.';
-        toast('error', msg);
-        setLastTxResult({ type: 'error', msg });
-        setTxPending('');
-        return;
-      }
 
       const amt = ethers.parseUnits(sendAmount, 6);
 

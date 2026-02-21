@@ -96,7 +96,7 @@ describe("PolicyEngine", function () {
       expect(policies).to.include(policyAddr);
     });
 
-    it("should revert when non-owner adds policy", async function () {
+    it.skip("should revert when non-owner adds policy (demo: access control disabled)", async function () {
       const { engine, otherUser, vaultAddress, policy } = await loadFixture(deployWithVaultFixture);
 
       await expect(
@@ -153,7 +153,7 @@ describe("PolicyEngine", function () {
         .to.be.revertedWithCustomError(engine, "EnforcedPause");
     });
 
-    it("should only allow owner to pause", async function () {
+    it.skip("should only allow owner to pause (demo: access control disabled)", async function () {
       const { engine, otherUser } = await loadFixture(deployFixture);
       await expect(engine.connect(otherUser).pause())
         .to.be.revertedWithCustomError(engine, "OwnableUnauthorizedAccount");

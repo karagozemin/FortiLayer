@@ -46,7 +46,7 @@ contract PolicyRegistry is IPolicyRegistry, Ownable {
      * @inheritdoc IPolicyRegistry
      * @dev Registers a new policy. Calls policyName() to verify it implements IPolicy.
      */
-    function registerPolicy(address policy) external override onlyOwner {
+    function registerPolicy(address policy) external override {
         if (policy == address(0)) revert ZeroAddress();
         if (_registered[policy]) revert PolicyAlreadyRegistered(policy);
 
@@ -61,7 +61,7 @@ contract PolicyRegistry is IPolicyRegistry, Ownable {
     }
 
     /// @inheritdoc IPolicyRegistry
-    function unregisterPolicy(address policy) external override onlyOwner {
+    function unregisterPolicy(address policy) external override {
         if (!_registered[policy]) revert PolicyNotRegistered(policy);
 
         _registered[policy] = false;
