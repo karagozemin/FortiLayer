@@ -61,7 +61,7 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | **3-layer circuit breaker** | Any single pause freezes everything. Three independent kill switches. |
 | **140 tests · 12 verified contracts · Stylus WASM deployed** | Production-grade, verifiable, not theoretical. |
 | **Full React dashboard** | WalletConnect + pre-flight simulation + 4 pages. Users see errors before spending gas. |
-| **Not a consumer dApp** | Institutional-grade infrastructure — aligned with Arbitrum's long-term strategy. |
+| **Not a consumer dApp** | Institutional-grade infrastructure — aligned with **Arbitrum's long-term strategy**. |
 
 ---
 
@@ -619,6 +619,8 @@ FortiLayer was not built to win a hackathon.
 It was built to solve a **structural flaw** in how on-chain capital is protected.
 
 The hackathon was simply the catalyst.
+
+It was built to become the **default execution control layer** for institutional capital on Arbitrum.
 
 ---
 
