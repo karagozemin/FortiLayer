@@ -21,10 +21,18 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
   const addToast = useCallback((type: ToastType, message: string) => {
     const id = ++_id;
-    setToasts(prev => [...prev, { id, type, message }]);
-    if (type !== 'pending') {
-      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 5000);
-    }
+
+    setToasts(prev => {
+      // When a result toast arrives, clear all pending toasts
+      const filtered = (type === 'success' || type === 'error')
+        ? prev.filter(t => t.type !== 'pending')
+        : prev;
+      return [...filtered, { id, type, message }];
+    });
+
+    // Auto-dismiss non-pending toasts; pending toasts also auto-dismiss after 60s as a safety net
+    const timeout = type === 'pending' ? 60_000 : 5_000;
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), timeout);
   }, []);
 
   const remove = (id: number) => setToasts(prev => prev.filter(t => t.id !== id));

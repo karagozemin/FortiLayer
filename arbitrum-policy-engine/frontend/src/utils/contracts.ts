@@ -335,3 +335,13 @@ export function parseContractError(err: any): string {
 export const GAS_OVERRIDES = {
   gasLimit: 3_000_000n,
 };
+
+// ── Wait for confirmation and verify success ───────────────────
+// Waits for the tx receipt and throws if it failed on-chain (status !== 1)
+export async function waitForTx(tx: any): Promise<any> {
+  const receipt = await tx.wait();
+  if (receipt && receipt.status === 0) {
+    throw new Error('Transaction was mined but reverted on-chain');
+  }
+  return receipt;
+}

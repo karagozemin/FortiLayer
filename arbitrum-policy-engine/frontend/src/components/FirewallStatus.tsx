@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError, GAS_OVERRIDES } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, parseContractError, GAS_OVERRIDES, waitForTx } from '../utils/contracts';
 import {
   IconRefresh, IconExternalLink, IconShield, IconEngine,
   IconTreasury, IconArrowRight, IconPolicy, IconCheck,
@@ -64,7 +64,7 @@ const FirewallStatus: React.FC = () => {
       const action = m.pePaused ? 'unpause' : 'pause';
       toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} PolicyEngine…`);
       const tx = m.pePaused ? await pe.unpause(GAS_OVERRIDES) : await pe.pause(GAS_OVERRIDES);
-      await tx.wait();
+      await waitForTx(tx);
       toast('success', `PolicyEngine ${action}d`);
       setShowConfirm(null);
       await fetchMetrics();
@@ -83,7 +83,7 @@ const FirewallStatus: React.FC = () => {
       const action = m.isPaused ? 'unpause' : 'pause';
       toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} Firewall…`);
       const tx = m.isPaused ? await fw.unpause(GAS_OVERRIDES) : await fw.pause(GAS_OVERRIDES);
-      await tx.wait();
+      await waitForTx(tx);
       toast('success', `TreasuryFirewall ${action}d`);
       setShowConfirm(null);
       await fetchMetrics();
@@ -102,7 +102,7 @@ const FirewallStatus: React.FC = () => {
       const action = m.tPaused ? 'emergencyUnpause' : 'emergencyPause';
       toast('pending', `${m.tPaused ? 'Unpausing' : 'Pausing'} Treasury…`);
       const tx = m.tPaused ? await treasury.emergencyUnpause(GAS_OVERRIDES) : await treasury.emergencyPause(GAS_OVERRIDES);
-      await tx.wait();
+      await waitForTx(tx);
       toast('success', `Treasury ${m.tPaused ? 'unpaused' : 'paused'}`);
       setShowConfirm(null);
       await fetchMetrics();
