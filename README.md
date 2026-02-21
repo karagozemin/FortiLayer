@@ -160,7 +160,7 @@ FortiLayer's 6-policy pipeline makes **5+ inter-contract calls per transfer**. T
 
 > **Low cost enables frequent checks. Stylus enables high-performance policy execution. Together, they make FortiLayer possible.**
 >
-> *Without L2 economics, this architecture is financially impractical.*
+> *Without Arbitrum's Stylus and L2 economics, FortiLayer's multi-policy architecture would be economically impractical on Ethereum mainnet.*
 
 ---
 
@@ -177,8 +177,6 @@ FortiLayer was designed against real-world treasury attack vectors. Every scenar
 | 5 | **High-risk counterparty** | Transfer to flagged/unknown address | ❌ **BLOCKED** — risk score below minimum threshold | RiskScorePolicy |
 | 6 | **Cumulative drain** | Many small txs that individually pass limits | ❌ **BLOCKED** — daily cumulative limit exceeded | SpendingLimitPolicy |
 | 7 | **Emergency exploit** | Active attack detected | 🛑 **HALTED** — emergency pause freezes all operations | Circuit Breaker (3-layer) |
-| 8 | **Policy bypass attempt** | Direct token transfer bypassing firewall | ❌ **IMPOSSIBLE** — tokens held by Treasury, only firewall can execute | Architecture |
-| 9 | **Governance misconfiguration** | Admin sets weak policy accidentally | ❌ **BLOCKED** — policy changes require owner role + multi-sig approval | Access Control |
 
 > **Every known treasury attack vector is covered by at least one policy. Most are covered by multiple overlapping layers.**
 
