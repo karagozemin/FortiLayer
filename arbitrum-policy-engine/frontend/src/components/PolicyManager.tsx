@@ -1,235 +1,253 @@
-import React, { useState } from 'react';
-import { PolicyType } from '../types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ethers } from 'ethers';
+import { useWallet } from '../hooks/useWallet';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress } from '../utils/contracts';
 
-// ── Policy Configuration ───────────────────────────────────────
-
-interface PolicyCardData {
-  type: PolicyType;
+interface PolicyData {
+  address: string;
   name: string;
-  description: string;
   icon: string;
   color: string;
   active: boolean;
-  params: { label: string; value: string; editable?: boolean }[];
+  params: { label: string; value: string }[];
 }
 
-const POLICY_DATA: PolicyCardData[] = [
-  {
-    type: 'SpendingLimit',
-    name: 'Spending Limit',
-    description: 'Enforces daily spending caps and per-transaction maximums to prevent treasury drain.',
-    icon: '💳',
-    color: '#3b82f6',
-    active: true,
-    params: [
-      { label: 'Daily Limit', value: '100,000 USDC', editable: true },
-      { label: 'Max Per Tx', value: '50,000 USDC', editable: true },
-      { label: 'Spent Today', value: '23,450 USDC' },
-      { label: 'Remaining', value: '76,550 USDC' },
-    ],
-  },
-  {
-    type: 'Whitelist',
-    name: 'Whitelist',
-    description: 'Only approved recipient addresses can receive funds. Blocks transfers to unknown wallets.',
-    icon: '✅',
-    color: '#10b981',
-    active: true,
-    params: [
-      { label: 'Whitelisted Addrs', value: '12' },
-      { label: 'Global Whitelist', value: '3' },
-      { label: 'Last Added', value: '2 hours ago' },
-    ],
-  },
-  {
-    type: 'Timelock',
-    name: 'Timelock',
-    description: 'Enforces a cooldown period between consecutive transactions to prevent rapid drain attacks.',
-    icon: '⏱',
-    color: '#f59e0b',
-    active: true,
-    params: [
-      { label: 'Cooldown Period', value: '300 seconds', editable: true },
-      { label: 'Last Transaction', value: '12 min ago' },
-      { label: 'Next Allowed', value: 'Now' },
-    ],
-  },
-  {
-    type: 'MultiSig',
-    name: 'Multi-Signature',
-    description: 'Requires M-of-N signer approvals before a transaction can execute. Enterprise-grade governance.',
-    icon: '✍️',
-    color: '#8b5cf6',
-    active: false,
-    params: [
-      { label: 'Required Sigs', value: '2 of 3' },
-      { label: 'Signers', value: '3 configured' },
-      { label: 'Pending Approvals', value: '0' },
-    ],
-  },
-  {
-    type: 'RiskScore',
-    name: 'Risk Score',
-    description: 'Assigns 0-100 risk scores to addresses. Blocks transactions to addresses below the safety threshold.',
-    icon: '📈',
-    color: '#ef4444',
-    active: true,
-    params: [
-      { label: 'Min Threshold', value: '50', editable: true },
-      { label: 'Default Score', value: '70' },
-      { label: 'Scored Addrs', value: '24' },
-      { label: 'Flagged', value: '3' },
-    ],
-  },
-];
-
-// ── Policy Card ────────────────────────────────────────────────
-
-const PolicyCard: React.FC<{
-  policy: PolicyCardData;
-  onToggle: (type: PolicyType) => void;
-}> = ({ policy, onToggle }) => (
-  <div className={`policy-card ${!policy.active ? 'inactive' : ''}`}>
-    <div className="policy-card-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <div
-          className="policy-icon"
-          style={{
-            background: `${policy.color}20`,
-            color: policy.color,
-            width: '48px',
-            height: '48px',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '24px',
-          }}
-        >
-          {policy.icon}
-        </div>
-        <div>
-          <h3 className="policy-card-title">{policy.name}</h3>
-          <span
-            className={`badge ${policy.active ? 'badge-success' : 'badge-warning'}`}
-            style={{ marginTop: '4px' }}
-          >
-            {policy.active ? 'Active' : 'Inactive'}
-          </span>
-        </div>
-      </div>
-      <label className="toggle-switch">
-        <input
-          type="checkbox"
-          checked={policy.active}
-          onChange={() => onToggle(policy.type)}
-        />
-        <span className="toggle-slider" />
-      </label>
-    </div>
-
-    <p className="policy-card-desc">{policy.description}</p>
-
-    <div className="policy-params">
-      {policy.params.map((param, idx) => (
-        <div key={idx} className="policy-param">
-          <span className="param-label">{param.label}</span>
-          <span className="param-value">
-            {param.value}
-            {param.editable && (
-              <button
-                className="param-edit-btn"
-                title="Edit parameter"
-              >
-                ✏️
-              </button>
-            )}
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-// ── Policy Manager Page ────────────────────────────────────────
+const POLICY_META: Record<string, { icon: string; color: string }> = {
+  SpendingLimitPolicy: { icon: '💳', color: '#3b82f6' },
+  WhitelistPolicy: { icon: '✅', color: '#10b981' },
+  TimelockPolicy: { icon: '⏱', color: '#f59e0b' },
+  MultiSigPolicy: { icon: '✍️', color: '#8b5cf6' },
+  RiskScorePolicy: { icon: '📈', color: '#ef4444' },
+};
 
 const PolicyManager: React.FC = () => {
-  const [policies, setPolicies] = useState(POLICY_DATA);
-  const [filter, setFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const { provider, signer } = useWallet();
+  const [policies, setPolicies] = useState<PolicyData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleToggle = (type: PolicyType) => {
-    setPolicies(prev =>
-      prev.map(p => (p.type === type ? { ...p, active: !p.active } : p))
+  const fetchPolicies = useCallback(async () => {
+    if (!provider) return;
+    setLoading(true);
+    try {
+      const s = signer || provider;
+      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, s);
+      const treasuryAddr = DEPLOYED_ADDRESSES.treasury;
+
+      // Get active policies for the treasury vault
+      const activePolicyAddrs: string[] = await pe.getVaultPolicies(treasuryAddr);
+      const activeSet = new Set(activePolicyAddrs.map((a: string) => a.toLowerCase()));
+
+      const results: PolicyData[] = [];
+
+      // SpendingLimitPolicy
+      if (DEPLOYED_ADDRESSES.spendingLimitPolicy) {
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, s);
+        const [name, dailyLimit, maxTx, spent, remaining] = await Promise.all([
+          c.policyName(),
+          c.defaultDailyLimit(),
+          c.defaultMaxTxAmount(),
+          c.getDailySpent(treasuryAddr),
+          c.getRemainingDailyAllowance(treasuryAddr),
+        ]);
+        results.push({
+          address: DEPLOYED_ADDRESSES.spendingLimitPolicy,
+          name,
+          ...POLICY_META.SpendingLimitPolicy,
+          active: activeSet.has(DEPLOYED_ADDRESSES.spendingLimitPolicy.toLowerCase()),
+          params: [
+            { label: 'Daily Limit', value: `${ethers.formatUnits(dailyLimit, 6)} USDC` },
+            { label: 'Max Per Tx', value: `${ethers.formatUnits(maxTx, 6)} USDC` },
+            { label: 'Spent Today', value: `${ethers.formatUnits(spent, 6)} USDC` },
+            { label: 'Remaining', value: `${ethers.formatUnits(remaining, 6)} USDC` },
+          ],
+        });
+      }
+
+      // WhitelistPolicy
+      if (DEPLOYED_ADDRESSES.whitelistPolicy) {
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, s);
+        const [name, vaultList] = await Promise.all([
+          c.policyName(),
+          c.getVaultWhitelist(treasuryAddr),
+        ]);
+        results.push({
+          address: DEPLOYED_ADDRESSES.whitelistPolicy,
+          name,
+          ...POLICY_META.WhitelistPolicy,
+          active: activeSet.has(DEPLOYED_ADDRESSES.whitelistPolicy.toLowerCase()),
+          params: [
+            { label: 'Whitelisted Addresses', value: vaultList.length.toString() },
+            ...vaultList.slice(0, 3).map((a: string, i: number) => ({
+              label: `Address #${i + 1}`,
+              value: shortenAddress(a),
+            })),
+          ],
+        });
+      }
+
+      // TimelockPolicy
+      if (DEPLOYED_ADDRESSES.timelockPolicy) {
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy, s);
+        const [name, duration, lastTx, unlockTime, isExpired] = await Promise.all([
+          c.policyName(),
+          c.getEffectiveTimelockDuration(treasuryAddr),
+          c.lastTransactionTime(treasuryAddr),
+          c.getUnlockTime(treasuryAddr),
+          c.isTimelockExpired(treasuryAddr),
+        ]);
+        results.push({
+          address: DEPLOYED_ADDRESSES.timelockPolicy,
+          name,
+          ...POLICY_META.TimelockPolicy,
+          active: activeSet.has(DEPLOYED_ADDRESSES.timelockPolicy.toLowerCase()),
+          params: [
+            { label: 'Cooldown Period', value: `${Number(duration)} seconds` },
+            { label: 'Last Tx Time', value: Number(lastTx) === 0 ? 'Never' : new Date(Number(lastTx) * 1000).toLocaleString() },
+            { label: 'Unlock Time', value: Number(unlockTime) === 0 ? 'Now' : new Date(Number(unlockTime) * 1000).toLocaleString() },
+            { label: 'Can Transact', value: isExpired ? '✅ Yes' : '❌ Locked' },
+          ],
+        });
+      }
+
+      // MultiSigPolicy (may not be deployed)
+      if (DEPLOYED_ADDRESSES.multiSigPolicy) {
+        try {
+          const c = new ethers.Contract(DEPLOYED_ADDRESSES.multiSigPolicy, ABIS.MultiSigPolicy, s);
+          const [name, signers, required] = await Promise.all([
+            c.policyName(),
+            c.getSigners(),
+            c.requiredApprovals(),
+          ]);
+          results.push({
+            address: DEPLOYED_ADDRESSES.multiSigPolicy,
+            name,
+            ...POLICY_META.MultiSigPolicy,
+            active: activeSet.has(DEPLOYED_ADDRESSES.multiSigPolicy.toLowerCase()),
+            params: [
+              { label: 'Required Sigs', value: `${Number(required)} of ${signers.length}` },
+              { label: 'Total Signers', value: signers.length.toString() },
+            ],
+          });
+        } catch { /* not deployed */ }
+      }
+
+      // RiskScorePolicy
+      if (DEPLOYED_ADDRESSES.riskScorePolicy) {
+        const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, s);
+        const [name, threshold, defaultSc, maxScore] = await Promise.all([
+          c.policyName(),
+          c.minThreshold(),
+          c.defaultScore(),
+          c.MAX_SCORE(),
+        ]);
+        results.push({
+          address: DEPLOYED_ADDRESSES.riskScorePolicy,
+          name,
+          ...POLICY_META.RiskScorePolicy,
+          active: activeSet.has(DEPLOYED_ADDRESSES.riskScorePolicy.toLowerCase()),
+          params: [
+            { label: 'Min Threshold', value: `${Number(threshold)} / ${Number(maxScore)}` },
+            { label: 'Default Score', value: Number(defaultSc).toString() },
+            { label: 'Max Score', value: Number(maxScore).toString() },
+          ],
+        });
+      }
+
+      setPolicies(results);
+    } catch (err) {
+      console.error('PolicyManager fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [provider, signer]);
+
+  useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
+
+  if (loading) {
+    return (
+      <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ color: 'var(--text-secondary)' }}>Reading policy state from chain...</p>
+        </div>
+      </div>
     );
-  };
-
-  const filtered = policies.filter(p => {
-    if (filter === 'active') return p.active;
-    if (filter === 'inactive') return !p.active;
-    return true;
-  });
+  }
 
   const activeCount = policies.filter(p => p.active).length;
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h2 className="page-title">Policy Manager</h2>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
-          Configure and manage treasury protection policies
-        </p>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 className="page-title">Policy Manager</h2>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
+            Live policy state from Arbitrum Sepolia
+          </p>
+        </div>
+        <button className="btn btn-secondary" onClick={fetchPolicies} style={{ padding: '8px 16px' }}>
+          🔄 Refresh
+        </button>
       </div>
 
-      {/* Summary Bar */}
+      {/* Summary */}
       <div className="card" style={{ marginBottom: '24px' }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '16px 24px',
-          flexWrap: 'wrap',
-          gap: '12px',
-        }}>
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>
-              <strong style={{ color: 'var(--text-primary)' }}>{activeCount}</strong> of{' '}
-              {policies.length} policies active
-            </span>
-            <div style={{
-              height: '8px',
-              width: '120px',
-              background: 'var(--bg-primary)',
-              borderRadius: '4px',
-              overflow: 'hidden',
-            }}>
-              <div style={{
-                height: '100%',
-                width: `${(activeCount / policies.length) * 100}%`,
-                background: 'var(--primary)',
-                borderRadius: '4px',
-              }} />
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {(['all', 'active', 'inactive'] as const).map(f => (
-              <button
-                key={f}
-                className={`btn ${filter === f ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setFilter(f)}
-                style={{ textTransform: 'capitalize', padding: '6px 16px', fontSize: '13px' }}
-              >
-                {f}
-              </button>
-            ))}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', flexWrap: 'wrap', gap: '12px' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>
+            <strong style={{ color: 'var(--text-primary)' }}>{activeCount}</strong> of {policies.length} policies active on treasury vault
+          </span>
+          <div style={{ height: '8px', width: '120px', background: 'var(--bg-primary)', borderRadius: '4px', overflow: 'hidden' }}>
+            <div style={{ height: '100%', width: `${policies.length > 0 ? (activeCount / policies.length) * 100 : 0}%`, background: 'var(--primary)', borderRadius: '4px' }} />
           </div>
         </div>
       </div>
 
-      {/* Policy Cards Grid */}
+      {/* Policy Cards */}
       <div className="policy-grid">
-        {filtered.map(policy => (
-          <PolicyCard key={policy.type} policy={policy} onToggle={handleToggle} />
+        {policies.map((policy) => (
+          <div key={policy.address} className={`policy-card ${!policy.active ? 'inactive' : ''}`}>
+            <div className="policy-card-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  background: `${policy.color}20`,
+                  color: policy.color,
+                  width: '48px', height: '48px', borderRadius: '12px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px',
+                }}>
+                  {policy.icon}
+                </div>
+                <div>
+                  <h3 className="policy-card-title">{policy.name}</h3>
+                  <span className={`badge ${policy.active ? 'badge-success' : 'badge-warning'}`} style={{ marginTop: '4px' }}>
+                    {policy.active ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+              <code style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                {shortenAddress(policy.address)}
+              </code>
+            </div>
+
+            <div className="policy-params">
+              {policy.params.map((param, idx) => (
+                <div key={idx} className="policy-param">
+                  <span className="param-label">{param.label}</span>
+                  <span className="param-value">{param.value}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+              <a
+                href={`https://sepolia.arbiscan.io/address/${policy.address}#code`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: 'var(--primary)', fontSize: '12px' }}
+              >
+                View on Arbiscan ↗
+              </a>
+            </div>
+          </div>
         ))}
       </div>
     </div>

@@ -1,247 +1,244 @@
-import React, { useState, useEffect } from 'react';
-import {
-  DashboardStats,
-  TransactionRecord,
-  TransactionStatus,
-} from '../types';
-import { shortenAddress, formatUSDC, formatTimestamp } from '../utils/contracts';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ethers } from 'ethers';
+import { useWallet } from '../hooks/useWallet';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp } from '../utils/contracts';
 
-// ── Mock data for demo (replace with live contract reads) ──────
+interface Stats {
+  treasuryBalance: bigint;
+  totalVaults: bigint;
+  totalTxValidated: bigint;
+  totalScreened: bigint;
+  totalPassed: bigint;
+  totalBlocked: bigint;
+  activePolicies: number;
+  isPaused: boolean;
+}
 
-const MOCK_STATS: DashboardStats = {
-  treasuryBalance: '250000',
-  totalTransactions: 47,
-  activePolicies: 5,
-  blockedTransactions: 12,
-  passRate: 74.5,
-};
-
-const MOCK_TRANSACTIONS: TransactionRecord[] = [
-  {
-    id: '1',
-    vault: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-    token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    to: '0x1234567890abcdef1234567890abcdef12345678',
-    amount: '5000',
-    timestamp: Date.now() / 1000 - 120,
-    status: 'passed',
-    txHash: '0xabc123...def456',
-  },
-  {
-    id: '2',
-    vault: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-    token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    to: '0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-    amount: '150000',
-    timestamp: Date.now() / 1000 - 600,
-    status: 'blocked',
-    failedPolicy: 'SpendingLimitPolicy',
-  },
-  {
-    id: '3',
-    vault: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-    token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    to: '0x9876543210fedcba9876543210fedcba98765432',
-    amount: '25000',
-    timestamp: Date.now() / 1000 - 1800,
-    status: 'passed',
-    txHash: '0x789abc...123def',
-  },
-  {
-    id: '4',
-    vault: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-    token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    to: '0xbaadf00dbaadf00dbaadf00dbaadf00dbaadf00d',
-    amount: '10000',
-    timestamp: Date.now() / 1000 - 3600,
-    status: 'blocked',
-    failedPolicy: 'RiskScorePolicy',
-  },
-  {
-    id: '5',
-    vault: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-    token: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-    to: '0xfeedfacefeedfacefeedfacefeedfacefeedface',
-    amount: '8000',
-    timestamp: Date.now() / 1000 - 7200,
-    status: 'passed',
-    txHash: '0xdef789...abc012',
-  },
-];
-
-// ── Stat Card Component ────────────────────────────────────────
-
-const StatCard: React.FC<{
-  label: string;
-  value: string;
-  icon: string;
-  trend?: string;
-  trendUp?: boolean;
-}> = ({ label, value, icon, trend, trendUp }) => (
-  <div className="stat-card">
-    <div className="stat-icon">{icon}</div>
-    <div className="stat-value">{value}</div>
-    <div className="stat-label">{label}</div>
-    {trend && (
-      <div className={`stat-trend ${trendUp ? 'up' : 'down'}`}>
-        {trendUp ? '↑' : '↓'} {trend}
-      </div>
-    )}
-  </div>
-);
-
-// ── Status Badge ───────────────────────────────────────────────
-
-const StatusBadge: React.FC<{ status: TransactionStatus }> = ({ status }) => {
-  const config = {
-    passed: { label: 'Passed', className: 'badge badge-success' },
-    blocked: { label: 'Blocked', className: 'badge badge-danger' },
-    pending: { label: 'Pending', className: 'badge badge-warning' },
-    executed: { label: 'Executed', className: 'badge badge-success' },
-  };
-  const { label, className } = config[status];
-  return <span className={className}>{label}</span>;
-};
-
-// ── Dashboard Component ────────────────────────────────────────
+interface ScreenEvent {
+  vault: string;
+  token: string;
+  to: string;
+  amount: bigint;
+  passed: boolean;
+  txHash: string;
+  blockNumber: number;
+  timestamp: number;
+}
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats>(MOCK_STATS);
-  const [transactions, setTransactions] = useState<TransactionRecord[]>(MOCK_TRANSACTIONS);
-  const [loading, setLoading] = useState(false);
+  const { provider, signer } = useWallet();
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [events, setEvents] = useState<ScreenEvent[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Animated counter effect
-  const [animatedBalance, setAnimatedBalance] = useState(0);
-  useEffect(() => {
-    const target = parseFloat(stats.treasuryBalance);
-    const duration = 1500;
-    const start = performance.now();
-    const animate = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-      setAnimatedBalance(target * eased);
-      if (progress < 1) requestAnimationFrame(animate);
-    };
-    requestAnimationFrame(animate);
-  }, [stats.treasuryBalance]);
+  const fetchData = useCallback(async () => {
+    if (!provider) return;
+    setLoading(true);
+    try {
+      const signerOrProvider = signer || provider;
+      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, signerOrProvider);
+      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, signerOrProvider);
+      const usdc = new ethers.Contract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC, signerOrProvider);
+      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signerOrProvider);
+
+      // Fetch all stats in parallel
+      const [totalVaults, totalTxValidated, isPaused, totalScreened, totalPassed, totalBlocked, treasuryBalance, vaultPolicies] = await Promise.all([
+        pe.totalVaults(),
+        pe.totalTransactionsValidated(),
+        pe.paused(),
+        fw.totalScreened(),
+        fw.totalPassed(),
+        fw.totalBlocked(),
+        usdc.balanceOf(DEPLOYED_ADDRESSES.treasury),
+        pe.getVaultPolicies(DEPLOYED_ADDRESSES.treasury).catch(() => []),
+      ]);
+
+      setStats({
+        treasuryBalance,
+        totalVaults,
+        totalTxValidated,
+        totalScreened,
+        totalPassed,
+        totalBlocked,
+        activePolicies: vaultPolicies.length,
+        isPaused,
+      });
+
+      // Fetch screening events from TreasuryFirewall
+      const filter = fw.filters.TransactionScreened();
+      const currentBlock = await provider.getBlockNumber();
+      const fromBlock = Math.max(0, currentBlock - 10000);
+      const logs = await fw.queryFilter(filter, fromBlock, currentBlock);
+
+      const parsed: ScreenEvent[] = await Promise.all(
+        logs.slice(-20).reverse().map(async (log: any) => {
+          const block = await provider.getBlock(log.blockNumber);
+          return {
+            vault: log.args[0],
+            token: log.args[1],
+            to: log.args[2],
+            amount: log.args[3],
+            passed: log.args[4],
+            txHash: log.transactionHash,
+            blockNumber: log.blockNumber,
+            timestamp: block?.timestamp || 0,
+          };
+        })
+      );
+      setEvents(parsed);
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [provider, signer]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) {
+    return (
+      <div className="page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
+          <p style={{ color: 'var(--text-secondary)' }}>Loading on-chain data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const passRate = stats && Number(stats.totalScreened) > 0
+    ? ((Number(stats.totalPassed) / Number(stats.totalScreened)) * 100).toFixed(1)
+    : '100.0';
 
   return (
     <div className="page">
-      <div className="page-header">
-        <h2 className="page-title">Dashboard</h2>
-        <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>
-          Real-time treasury protection overview
-        </p>
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <h2 className="page-title">Dashboard</h2>
+          <p style={{ color: 'var(--text-secondary)', marginTop: '4px' }}>Live data from Arbitrum Sepolia</p>
+        </div>
+        <button className="btn btn-secondary" onClick={fetchData} style={{ padding: '8px 16px' }}>
+          🔄 Refresh
+        </button>
       </div>
 
       {/* Stats Grid */}
       <div className="stats-grid">
-        <StatCard
-          icon="💰"
-          label="Treasury Balance"
-          value={formatUSDC(animatedBalance.toFixed(0))}
-          trend="+12.5% this week"
-          trendUp={true}
-        />
-        <StatCard
-          icon="📊"
-          label="Total Transactions"
-          value={stats.totalTransactions.toString()}
-          trend="8 today"
-          trendUp={true}
-        />
-        <StatCard
-          icon="📋"
-          label="Active Policies"
-          value={stats.activePolicies.toString()}
-        />
-        <StatCard
-          icon="🚫"
-          label="Blocked"
-          value={stats.blockedTransactions.toString()}
-          trend={`${stats.passRate}% pass rate`}
-          trendUp={stats.passRate > 70}
-        />
-      </div>
-
-      {/* Recent Transactions */}
-      <div className="card" style={{ marginTop: '24px' }}>
-        <div className="card-header">
-          <h3 className="card-title">Recent Transactions</h3>
-          <span className="badge badge-info">{transactions.length} total</span>
+        <div className="stat-card">
+          <div className="stat-icon">💰</div>
+          <div className="stat-value">{stats ? formatUSDC(stats.treasuryBalance) : '$0'}</div>
+          <div className="stat-label">Treasury Balance</div>
         </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Recipient</th>
-              <th>Amount</th>
-              <th>Time</th>
-              <th>Policy</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transactions.map((tx) => (
-              <tr key={tx.id}>
-                <td>
-                  <StatusBadge status={tx.status} />
-                </td>
-                <td>
-                  <code>{shortenAddress(tx.to)}</code>
-                </td>
-                <td>{formatUSDC(tx.amount)}</td>
-                <td>{formatTimestamp(tx.timestamp)}</td>
-                <td>
-                  {tx.failedPolicy ? (
-                    <span className="badge badge-danger">{tx.failedPolicy}</span>
-                  ) : (
-                    <span style={{ color: 'var(--text-muted)' }}>—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="stat-card">
+          <div className="stat-icon">📊</div>
+          <div className="stat-value">{stats ? Number(stats.totalScreened).toString() : '0'}</div>
+          <div className="stat-label">Total Screened</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon">📋</div>
+          <div className="stat-value">{stats?.activePolicies ?? 0}</div>
+          <div className="stat-label">Active Policies</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-icon">🚫</div>
+          <div className="stat-value" style={{ color: 'var(--danger)' }}>{stats ? Number(stats.totalBlocked).toString() : '0'}</div>
+          <div className="stat-label">Blocked</div>
+        </div>
       </div>
 
-      {/* Pass Rate Visual */}
+      {/* Pass Rate Bar */}
       <div className="card" style={{ marginTop: '24px' }}>
         <div className="card-header">
           <h3 className="card-title">Firewall Pass Rate</h3>
+          <span className="badge badge-success">{passRate}%</span>
         </div>
         <div style={{ padding: '0 24px 24px' }}>
-          <div style={{
-            height: '12px',
-            background: 'var(--bg-primary)',
-            borderRadius: '6px',
-            overflow: 'hidden',
-            marginTop: '8px',
-          }}>
+          <div style={{ height: '12px', background: 'var(--bg-primary)', borderRadius: '6px', overflow: 'hidden' }}>
             <div style={{
               height: '100%',
-              width: `${stats.passRate}%`,
-              background: 'linear-gradient(90deg, var(--success), var(--primary))',
+              width: `${passRate}%`,
+              background: `linear-gradient(90deg, var(--success), var(--primary))`,
               borderRadius: '6px',
-              transition: 'width 1.5s ease-out',
+              transition: 'width 0.5s ease',
             }} />
           </div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginTop: '8px',
-            fontSize: '12px',
-            color: 'var(--text-secondary)',
-          }}>
-            <span>{stats.totalTransactions - stats.blockedTransactions} passed</span>
-            <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
-              {stats.passRate}%
-            </span>
-            <span>{stats.blockedTransactions} blocked</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>
+            <span>✅ Passed: {stats ? Number(stats.totalPassed).toString() : '0'}</span>
+            <span>🚫 Blocked: {stats ? Number(stats.totalBlocked).toString() : '0'}</span>
           </div>
+        </div>
+      </div>
+
+      {/* System Overview */}
+      <div className="card" style={{ marginTop: '24px' }}>
+        <div className="card-header">
+          <h3 className="card-title">System Overview</h3>
+          <span className={`badge ${stats?.isPaused ? 'badge-danger' : 'badge-success'}`}>
+            {stats?.isPaused ? '⏸ Paused' : '● Live'}
+          </span>
+        </div>
+        <div style={{ padding: '0 24px 24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <InfoRow label="Registered Vaults" value={stats ? Number(stats.totalVaults).toString() : '0'} />
+            <InfoRow label="Transactions Validated" value={stats ? Number(stats.totalTxValidated).toString() : '0'} />
+            <InfoRow label="PolicyEngine" value={shortenAddress(DEPLOYED_ADDRESSES.policyEngine)} />
+            <InfoRow label="TreasuryFirewall" value={shortenAddress(DEPLOYED_ADDRESSES.treasuryFirewall)} />
+            <InfoRow label="Treasury" value={shortenAddress(DEPLOYED_ADDRESSES.treasury)} />
+            <InfoRow label="MockUSDC" value={shortenAddress(DEPLOYED_ADDRESSES.mockUSDC)} />
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Screening Events */}
+      <div className="card" style={{ marginTop: '24px' }}>
+        <div className="card-header">
+          <h3 className="card-title">Recent Screening Events</h3>
+          <span className="badge badge-info">{events.length} events</span>
+        </div>
+        <div style={{ padding: '0 24px 24px' }}>
+          {events.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '24px' }}>
+              No screening events yet. Run the demo script to generate transactions.
+            </p>
+          ) : (
+            <div className="timeline">
+              {events.map((ev, i) => (
+                <div key={i} className={`timeline-item ${ev.passed ? 'passed' : 'blocked'}`}>
+                  <div className="timeline-dot" />
+                  <div className="timeline-content">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span className={`badge ${ev.passed ? 'badge-success' : 'badge-danger'}`}>
+                          {ev.passed ? '✅ Passed' : '🚫 Blocked'}
+                        </span>
+                        <span style={{ fontWeight: 600 }}>{formatUSDC(ev.amount)}</span>
+                      </div>
+                      <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                        {ev.timestamp ? formatTimestamp(ev.timestamp) : `Block #${ev.blockNumber}`}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '24px', marginTop: '8px', fontSize: '13px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                      <span>To: <code>{shortenAddress(ev.to)}</code></span>
+                      <a href={`https://sepolia.arbiscan.io/tx/${ev.txHash}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)' }}>
+                        View on Arbiscan ↗
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
+
+const InfoRow: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+    <span style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>{label}</span>
+    <span style={{ fontWeight: 600, fontSize: '13px', fontFamily: 'monospace' }}>{value}</span>
+  </div>
+);
 
 export default Dashboard;
