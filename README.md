@@ -40,7 +40,7 @@ Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk s
 | 🔗 **Oracle** | Live Chainlink ETH/USD — market stress automatically tightens execution permissions |
 | ✅ **Status** | 12 contracts deployed & verified · 140 tests · Full React dashboard · Live on Arbitrum Sepolia |
 
-[Architecture](#-architecture) · [Why Arbitrum?](#-why-arbitrum) · [Stylus](#-stylus--the-performance-layer) · [Oracle](#-adaptive-risk--chainlink-oracle) · [Deployment](#-deployed-contracts) · [Demo](#-demo)
+[Architecture](#-architecture) · [Why Arbitrum?](#-why-arbitrum) · [Stylus](#-stylus--the-performance-layer) · [Oracle](#-adaptive-risk--chainlink-oracle) · [Deployment](#-deployed-contracts) · [Demo](#-demo) · [Full Architecture ↗](ARCHITECTURE.md)
 
 </div>
 
