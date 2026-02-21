@@ -8,6 +8,9 @@
 
 > *The first programmable policy layer built natively for Arbitrum Stylus.*
 
+> Smart contracts can be correct — and capital can still be stolen.
+> **FortiLayer fixes the execution layer.**
+
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636?logo=solidity)](https://soliditylang.org/)
 [![Rust](https://img.shields.io/badge/Rust-Stylus%20WASM-orange?logo=rust)](https://docs.arbitrum.io/stylus/gentle-introduction)
 [![Arbitrum](https://img.shields.io/badge/Arbitrum-Sepolia-blue?logo=arbitrum)](https://arbitrum.io/)
@@ -58,6 +61,7 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | **3-layer circuit breaker** | Any single pause freezes everything. Three independent kill switches. |
 | **140 tests · 12 verified contracts · Stylus WASM deployed** | Production-grade, verifiable, not theoretical. |
 | **Full React dashboard** | WalletConnect + pre-flight simulation + 4 pages. Users see errors before spending gas. |
+| **Not a consumer dApp** | Institutional-grade infrastructure — aligned with Arbitrum's long-term strategy. |
 
 ---
 
@@ -155,6 +159,8 @@ FortiLayer's 6-policy pipeline makes **5+ inter-contract calls per transfer**. T
 | **Orbit L3** | Custom chains can embed FortiLayer as a **native compliance layer** | Chain-level execution control |
 
 > **Low cost enables frequent checks. Stylus enables high-performance policy execution. Together, they make FortiLayer possible.**
+>
+> *Without L2 economics, this architecture is financially impractical.*
 
 ---
 
