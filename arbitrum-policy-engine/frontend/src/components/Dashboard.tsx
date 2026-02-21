@@ -170,8 +170,51 @@ const Dashboard: React.FC = () => {
     try {
       const signer = await provider.getSigner();
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
-
       const amt = ethers.parseUnits(sendAmount, 6);
+
+      // ── Pre-flight policy validation ──────────────────────
+      // Check each active policy BEFORE sending the tx to avoid wasting gas
+      toast('pending', 'Validating policies…');
+      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
+      const policyAddrs: string[] = await pe.getVaultPolicies(DEPLOYED_ADDRESSES.treasury);
+
+      const GENERIC_POLICY_ABI = [
+        'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
+        'function policyName() pure returns (string)',
+      ];
+
+      const failures: string[] = [];
+      for (const pAddr of policyAddrs) {
+        const pc = new ethers.Contract(pAddr, GENERIC_POLICY_ABI, provider);
+        try {
+          const ok = await pc.validate(DEPLOYED_ADDRESSES.treasury, DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt);
+          if (!ok) {
+            let name = shortenAddress(pAddr);
+            try { name = await pc.policyName(); } catch {}
+            failures.push(`${name}: validation returned false`);
+          }
+        } catch (pErr: any) {
+          let name = shortenAddress(pAddr);
+          try { name = await pc.policyName(); } catch {}
+
+          // Extract human-readable reason from revert
+          let reason = 'validation reverted';
+          if (pErr?.reason) reason = pErr.reason;
+          else if (pErr?.shortMessage) reason = pErr.shortMessage.replace('execution reverted: ', '');
+          else if (pErr?.message && pErr.message.length < 200) reason = pErr.message;
+
+          failures.push(`${name}: ${reason}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        const detail = failures.join('\n• ');
+        const msg = `Transfer blocked by policies:\n• ${detail}`;
+        toast('error', msg);
+        setLastTxResult({ type: 'error', msg });
+        return;
+      }
+      // ── End pre-flight ────────────────────────────────────
 
       toast('pending', 'Requesting transfer through firewall…');
       const tx = await treasury.requestTransfer(DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt, GAS_OVERRIDES);
