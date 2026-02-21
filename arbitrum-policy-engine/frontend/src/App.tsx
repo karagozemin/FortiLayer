@@ -9,6 +9,7 @@ import {
   IconShield, IconDashboard, IconPolicy, IconTransaction,
   IconFirewall, IconAlertTriangle,
 } from './components/Icons';
+import logoImg from './assets/logo.png';
 
 type Page = 'dashboard' | 'policies' | 'transactions' | 'firewall';
 
@@ -37,9 +38,7 @@ const AppContent: React.FC = () => {
     if (!isConnected) {
       return (
         <div className="welcome">
-          <div className="welcome-icon">
-            <IconShield />
-          </div>
+          <img src={logoImg} alt="FortiLayer" className="welcome-logo" />
           <h2>Welcome to FortiLayer</h2>
           <p>
             Programmable treasury execution firewall deployed on Arbitrum Sepolia.
@@ -99,9 +98,7 @@ const AppContent: React.FC = () => {
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="brand-icon">
-            <IconShield />
-          </div>
+          <img src={logoImg} alt="FortiLayer" className="brand-logo" />
           <div>
             <h1>FortiLayer</h1>
             <span>Treasury Firewall</span>

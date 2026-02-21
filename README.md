@@ -1,6 +1,8 @@
 <div align="center">
 
-# 🛡 FortiLayer
+<img src="assets/logo.png" alt="FortiLayer Logo" width="200" />
+
+# FortiLayer
 
 ### Programmable Treasury Execution Firewall on Arbitrum
 
