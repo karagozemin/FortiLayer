@@ -18,6 +18,8 @@
 ---
 
 > **No transaction leaves the vault without passing every policy. Period.**
+>
+> *FortiLayer turns Arbitrum into an institution-ready execution environment.*
 
 FortiLayer is an **atomic, composable execution firewall** for on-chain treasuries.
 Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk scoring, and **live Chainlink oracle** — enforce institutional-grade controls on every outbound transfer. The performance-critical path runs on **Stylus (Rust/WASM)** for 10x gas efficiency.
@@ -41,7 +43,7 @@ Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk s
 
 ## 🏆 Why FortiLayer Wins
 
-> **FortiLayer goes beyond a demo and ships production-grade infrastructure.**
+> **FortiLayer delivers production-grade infrastructure built specifically for Arbitrum.**
 
 Everything below is shipped, deployed, and verified — not planned, not mocked:
 
@@ -67,6 +69,20 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | **Real-world use case** | Institutional treasury protection — $50B+ addressable market |
 | **Technical depth** | 6 composable policies · 140 tests · two-phase atomic validation · 3-layer circuit breaker |
 | **Complete product** | Smart contracts + React dashboard + WalletConnect + pre-flight simulation |
+
+---
+
+## 🔵 Why This Strengthens Arbitrum
+
+FortiLayer is not just a treasury tool — it is **ecosystem infrastructure**.
+
+- **Enables institutional capital** to deploy safely on Arbitrum — not just cheaply
+- **Increases TVL retention** by preventing catastrophic treasury drains
+- **Makes Orbit chains institution-ready** by default — embed FortiLayer as a native compliance layer
+- **Positions Arbitrum as the compliance-ready L2** — the chain where institutions *want* to build
+- **Showcases Stylus** as a real production tool — not just a demo feature
+
+> Scalable execution is not enough. **Controlled execution is the next layer.** FortiLayer builds it on Arbitrum.
 
 ---
 
