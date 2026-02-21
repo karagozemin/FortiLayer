@@ -26,3 +26,4 @@ coverage.json
 # Misc
 *.log
 npm-debug.log*
+.vite/
