@@ -3,6 +3,7 @@ import Dashboard from './components/Dashboard';
 import PolicyManager from './components/PolicyManager';
 import TransactionQueue from './components/TransactionQueue';
 import FirewallStatus from './components/FirewallStatus';
+import { ToastProvider } from './components/Toast';
 import { WalletProvider, useWallet, ARBITRUM_SEPOLIA_CHAIN_ID } from './hooks/useWallet';
 import {
   IconShield, IconDashboard, IconPolicy, IconTransaction,
@@ -154,7 +155,9 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => (
   <WalletProvider>
-    <AppContent />
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   </WalletProvider>
 );
 

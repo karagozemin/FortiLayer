@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp } from '../utils/contracts';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp, getExplorerUrl } from '../utils/contracts';
 import { IconRefresh, IconExternalLink, IconInbox } from './Icons';
 
 interface ScreenEvent {
@@ -23,10 +23,12 @@ const TransactionQueue: React.FC = () => {
   const [filter, setFilter] = useState<Filter>('all');
   const [loading, setLoading] = useState(true);
   const [counters, setCounters] = useState({ screened: 0, passed: 0, blocked: 0 });
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchEvents = useCallback(async () => {
     if (!provider) return;
-    setLoading(true);
     try {
       const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, provider);
 
@@ -52,6 +54,7 @@ const TransactionQueue: React.FC = () => {
         })
       );
       setEvents(parsed);
+      setLastUpdate(new Date());
     } catch (err) {
       console.error('TransactionQueue error:', err);
     } finally {
@@ -59,7 +62,17 @@ const TransactionQueue: React.FC = () => {
     }
   }, [provider]);
 
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  useEffect(() => { setLoading(true); fetchEvents(); }, [fetchEvents]);
+
+  // Auto-refresh
+  useEffect(() => {
+    if (autoRefresh) {
+      intervalRef.current = setInterval(fetchEvents, 15000);
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [autoRefresh, fetchEvents]);
 
   const filtered = events.filter(ev =>
     filter === 'all' ? true : filter === 'passed' ? ev.passed : !ev.passed
@@ -92,10 +105,16 @@ const TransactionQueue: React.FC = () => {
         <div className="card-head">
           <h3>Screening History</h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label className="auto-refresh" style={{ cursor: 'pointer' }}>
+              <span style={autoRefresh ? { width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' } : { width: 6, height: 6, borderRadius: '50%', background: 'var(--text-3)', display: 'inline-block' }} />
+              <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} style={{ display: 'none' }} />
+              <span style={{ fontSize: 11 }}>Live</span>
+            </label>
             <div className="tabs">
               {(['all', 'passed', 'blocked'] as const).map(f => (
                 <button key={f} className={`tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
                   {f.charAt(0).toUpperCase() + f.slice(1)}
+                  {f === 'passed' ? ` (${counters.passed})` : f === 'blocked' ? ` (${counters.blocked})` : ''}
                 </button>
               ))}
             </div>
@@ -103,13 +122,22 @@ const TransactionQueue: React.FC = () => {
           </div>
         </div>
 
+        {lastUpdate && (
+          <div style={{ padding: '4px 20px', fontSize: 11, color: 'var(--text-3)', borderBottom: '1px solid var(--border)' }}>
+            Last updated: {lastUpdate.toLocaleTimeString()}
+            {autoRefresh && <span style={{ marginLeft: 6 }}> • refreshes every 15s</span>}
+          </div>
+        )}
+
         <div className="card-body">
           {filtered.length === 0 ? (
             <div className="empty">
               <IconInbox />
               <p>{events.length === 0 ? 'No screening events yet' : 'No matching events'}</p>
               {events.length === 0 && (
-                <p style={{ marginTop: 4 }}>Run <code>npx hardhat run scripts/demo.ts --network arbitrumSepolia</code></p>
+                <p style={{ marginTop: 4, fontSize: 12, color: 'var(--text-3)' }}>
+                  Go to Dashboard → Send Transfer to create a transaction
+                </p>
               )}
             </div>
           ) : (
@@ -139,7 +167,7 @@ const TransactionQueue: React.FC = () => {
                       {ev.timestamp ? formatTimestamp(ev.timestamp) : `#${ev.blockNumber}`}
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      <a href={`https://sepolia.arbiscan.io/tx/${ev.txHash}`} target="_blank" rel="noopener noreferrer"
+                      <a href={getExplorerUrl(ev.txHash)} target="_blank" rel="noopener noreferrer"
                         style={{ fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                         View <IconExternalLink style={{ width: 11, height: 11 }} />
                       </a>

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
-import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp } from '../utils/contracts';
-import { IconRefresh, IconTreasury, IconShield, IconPolicy, IconActivity, IconExternalLink } from './Icons';
+import { DEPLOYED_ADDRESSES, ABIS, shortenAddress, formatUSDC, formatTimestamp, getExplorerUrl } from '../utils/contracts';
+import { IconRefresh, IconTreasury, IconShield, IconPolicy, IconActivity, IconExternalLink, IconSend, IconChevronDown, IconDownload } from './Icons';
+import { useToast } from './Toast';
 
 interface Stats {
   treasuryBalance: bigint;
@@ -13,6 +14,8 @@ interface Stats {
   totalBlocked: bigint;
   activePolicies: number;
   isPaused: boolean;
+  walletUSDC: bigint;
+  walletAllowance: bigint;
 }
 
 interface ScreenEvent {
@@ -27,20 +30,32 @@ interface ScreenEvent {
 }
 
 const Dashboard: React.FC = () => {
-  const { provider } = useWallet();
+  const { provider, address } = useWallet();
+  const { toast } = useToast();
   const [stats, setStats] = useState<Stats | null>(null);
   const [events, setEvents] = useState<ScreenEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Action States ─────────────
+  const [openPanel, setOpenPanel] = useState<string | null>(null);
+  const [sendTo, setSendTo] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [mintAmount, setMintAmount] = useState('');
+  const [depositAmount, setDepositAmount] = useState('');
+  const [txPending, setTxPending] = useState('');
+  const [lastTxResult, setLastTxResult] = useState<{ type: 'success' | 'error'; msg: string; hash?: string } | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!provider) return;
-    setLoading(true);
     try {
       const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
       const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, provider);
       const usdc = new ethers.Contract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC, provider);
 
-      const [totalVaults, totalTxValidated, isPaused, totalScreened, totalPassed, totalBlocked, treasuryBalance, vaultPolicies] = await Promise.all([
+      const walletAddr = address || ethers.ZeroAddress;
+      const [totalVaults, totalTxValidated, isPaused, totalScreened, totalPassed, totalBlocked, treasuryBalance, vaultPolicies, walletUSDC, walletAllowance] = await Promise.all([
         pe.totalVaults(),
         pe.totalTransactionsValidated(),
         pe.paused(),
@@ -49,9 +64,14 @@ const Dashboard: React.FC = () => {
         fw.totalBlocked(),
         usdc.balanceOf(DEPLOYED_ADDRESSES.treasury),
         pe.getVaultPolicies(DEPLOYED_ADDRESSES.treasury).catch(() => []),
+        usdc.balanceOf(walletAddr).catch(() => 0n),
+        usdc.allowance(walletAddr, DEPLOYED_ADDRESSES.treasury).catch(() => 0n),
       ]);
 
-      setStats({ treasuryBalance, totalVaults, totalTxValidated, totalScreened, totalPassed, totalBlocked, activePolicies: vaultPolicies.length, isPaused });
+      setStats({
+        treasuryBalance, totalVaults, totalTxValidated, totalScreened, totalPassed, totalBlocked,
+        activePolicies: vaultPolicies.length, isPaused, walletUSDC, walletAllowance,
+      });
 
       const filter = fw.filters.TransactionScreened();
       const currentBlock = await provider.getBlockNumber();
@@ -75,9 +95,111 @@ const Dashboard: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [provider]);
+  }, [provider, address]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  useEffect(() => { setLoading(true); fetchData(); }, [fetchData]);
+
+  // Auto-refresh
+  useEffect(() => {
+    if (autoRefresh) {
+      intervalRef.current = setInterval(fetchData, 15000);
+    } else {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [autoRefresh, fetchData]);
+
+  // ── Action Handlers ─────────────
+  const handleMint = async () => {
+    if (!provider || !mintAmount) return;
+    setTxPending('mint');
+    setLastTxResult(null);
+    try {
+      const signer = await provider.getSigner();
+      const usdc = new ethers.Contract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC, signer);
+      const amt = ethers.parseUnits(mintAmount, 6);
+      toast('pending', 'Minting USDC…');
+      const tx = await usdc.mint(await signer.getAddress(), amt);
+      await tx.wait();
+      toast('success', `Minted ${mintAmount} USDC`);
+      setLastTxResult({ type: 'success', msg: `Minted ${mintAmount} USDC`, hash: tx.hash });
+      setMintAmount('');
+      await fetchData();
+    } catch (err: any) {
+      const msg = err?.reason || err?.shortMessage || err?.message || 'Mint failed';
+      toast('error', msg);
+      setLastTxResult({ type: 'error', msg });
+    } finally { setTxPending(''); }
+  };
+
+  const handleDeposit = async () => {
+    if (!provider || !depositAmount) return;
+    setTxPending('deposit');
+    setLastTxResult(null);
+    try {
+      const signer = await provider.getSigner();
+      const usdc = new ethers.Contract(DEPLOYED_ADDRESSES.mockUSDC, ABIS.MockUSDC, signer);
+      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
+      const amt = ethers.parseUnits(depositAmount, 6);
+
+      // Approve first
+      toast('pending', 'Approving USDC…');
+      const approveTx = await usdc.approve(DEPLOYED_ADDRESSES.treasury, amt);
+      await approveTx.wait();
+
+      // Deposit
+      toast('pending', 'Depositing to Treasury…');
+      const depTx = await treasury.deposit(DEPLOYED_ADDRESSES.mockUSDC, amt);
+      await depTx.wait();
+
+      toast('success', `Deposited ${depositAmount} USDC to Treasury`);
+      setLastTxResult({ type: 'success', msg: `Deposited ${depositAmount} USDC`, hash: depTx.hash });
+      setDepositAmount('');
+      await fetchData();
+    } catch (err: any) {
+      const msg = err?.reason || err?.shortMessage || err?.message || 'Deposit failed';
+      toast('error', msg);
+      setLastTxResult({ type: 'error', msg });
+    } finally { setTxPending(''); }
+  };
+
+  const handleTransfer = async () => {
+    if (!provider || !sendTo || !sendAmount) return;
+    setTxPending('transfer');
+    setLastTxResult(null);
+    try {
+      const signer = await provider.getSigner();
+      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
+      const amt = ethers.parseUnits(sendAmount, 6);
+
+      toast('pending', 'Requesting transfer through firewall…');
+      const tx = await treasury.requestTransfer(DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt);
+      const receipt = await tx.wait();
+
+      // Check if it was passed or blocked by looking at events
+      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, provider);
+      const screenedLogs = receipt.logs.map((l: any) => {
+        try { return fw.interface.parseLog({ topics: l.topics as string[], data: l.data }); } catch { return null; }
+      }).filter(Boolean);
+      const screenResult = screenedLogs.find((l: any) => l?.name === 'TransactionScreened');
+      const passed = screenResult ? screenResult.args[4] : true;
+
+      if (passed) {
+        toast('success', `Transfer of ${sendAmount} USDC sent through firewall`);
+        setLastTxResult({ type: 'success', msg: `${sendAmount} USDC transferred to ${shortenAddress(sendTo)}`, hash: tx.hash });
+      } else {
+        toast('error', 'Transfer was BLOCKED by firewall policies');
+        setLastTxResult({ type: 'error', msg: `Blocked by firewall — policies rejected the transfer` });
+      }
+      setSendTo('');
+      setSendAmount('');
+      await fetchData();
+    } catch (err: any) {
+      const msg = err?.reason || err?.shortMessage || err?.message || 'Transfer failed';
+      toast('error', msg);
+      setLastTxResult({ type: 'error', msg });
+    } finally { setTxPending(''); }
+  };
 
   if (loading) {
     return <div className="loading"><div className="spinner" /><p>Loading on-chain data…</p></div>;
@@ -86,6 +208,11 @@ const Dashboard: React.FC = () => {
   const passRate = stats && Number(stats.totalScreened) > 0
     ? ((Number(stats.totalPassed) / Number(stats.totalScreened)) * 100).toFixed(1)
     : '100.0';
+
+  const togglePanel = (id: string) => {
+    setOpenPanel(prev => prev === id ? null : id);
+    setLastTxResult(null);
+  };
 
   return (
     <>
@@ -115,8 +242,105 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* ── ACTION PANELS ─────────────────────────────────── */}
+
+      {/* Mint USDC */}
+      <div className={`action-panel ${openPanel === 'mint' ? 'open' : ''}`}>
+        <div className="action-panel-head" onClick={() => togglePanel('mint')}>
+          <h3><IconTreasury style={{ width: 16, height: 16 }} /> Mint Test USDC</h3>
+          <IconChevronDown className="chevron" />
+        </div>
+        {openPanel === 'mint' && (
+          <div className="action-panel-body">
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 12 }}>
+              Mint MockUSDC tokens to your wallet for testing. Your balance: <strong style={{ color: 'var(--text-1)' }}>{stats ? formatUSDC(stats.walletUSDC) : '$0.00'}</strong>
+            </p>
+            <div className="input-row">
+              <div className="form-group">
+                <label>Amount (USDC)</label>
+                <input className="input" type="number" placeholder="1000" value={mintAmount} onChange={e => setMintAmount(e.target.value)} />
+              </div>
+              <button className="btn btn-blue" onClick={handleMint} disabled={!!txPending || !mintAmount}>
+                {txPending === 'mint' ? 'Minting…' : 'Mint USDC'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Deposit to Treasury */}
+      <div className={`action-panel ${openPanel === 'deposit' ? 'open' : ''}`}>
+        <div className="action-panel-head" onClick={() => togglePanel('deposit')}>
+          <h3><IconDownload style={{ width: 16, height: 16 }} /> Deposit to Treasury</h3>
+          <IconChevronDown className="chevron" />
+        </div>
+        {openPanel === 'deposit' && (
+          <div className="action-panel-body">
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 12 }}>
+              Deposit USDC from your wallet into the Treasury vault. Wallet balance: <strong style={{ color: 'var(--text-1)' }}>{stats ? formatUSDC(stats.walletUSDC) : '$0.00'}</strong>
+            </p>
+            <div className="input-row">
+              <div className="form-group">
+                <label>Amount (USDC)</label>
+                <input className="input" type="number" placeholder="500" value={depositAmount} onChange={e => setDepositAmount(e.target.value)} />
+              </div>
+              <button className="btn btn-blue" onClick={handleDeposit} disabled={!!txPending || !depositAmount}>
+                {txPending === 'deposit' ? 'Depositing…' : 'Approve & Deposit'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Send Transfer */}
+      <div className={`action-panel ${openPanel === 'transfer' ? 'open' : ''}`}>
+        <div className="action-panel-head" onClick={() => togglePanel('transfer')}>
+          <h3><IconSend style={{ width: 16, height: 16 }} /> Send Transfer (Through Firewall)</h3>
+          <IconChevronDown className="chevron" />
+        </div>
+        {openPanel === 'transfer' && (
+          <div className="action-panel-body">
+            <p style={{ fontSize: 12.5, color: 'var(--text-3)', marginBottom: 12 }}>
+              Request a USDC transfer from Treasury. The transaction will be screened by all active policies.
+              Treasury balance: <strong style={{ color: 'var(--text-1)' }}>{stats ? formatUSDC(stats.treasuryBalance) : '$0.00'}</strong>
+            </p>
+            <div className="form-group">
+              <label>Recipient Address</label>
+              <input className="input mono" placeholder="0x..." value={sendTo} onChange={e => setSendTo(e.target.value)} />
+            </div>
+            <div className="input-row">
+              <div className="form-group">
+                <label>Amount (USDC)</label>
+                <input className="input" type="number" placeholder="100" value={sendAmount} onChange={e => setSendAmount(e.target.value)} />
+              </div>
+              <button className="btn btn-green" onClick={handleTransfer} disabled={!!txPending || !sendTo || !sendAmount}>
+                {txPending === 'transfer' ? 'Sending…' : 'Send Transfer'}
+              </button>
+            </div>
+            {stats?.isPaused && (
+              <div className="tx-result error" style={{ marginTop: 10 }}>
+                ⚠ PolicyEngine is paused — transfers will be blocked
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Tx result */}
+      {lastTxResult && (
+        <div className={`tx-result ${lastTxResult.type}`}>
+          <span>{lastTxResult.type === 'success' ? '✓' : '✗'}</span>
+          <span style={{ flex: 1 }}>{lastTxResult.msg}</span>
+          {lastTxResult.hash && (
+            <a href={getExplorerUrl(lastTxResult.hash)} target="_blank" rel="noopener noreferrer">
+              View Tx <IconExternalLink style={{ width: 11, height: 11, display: 'inline', verticalAlign: '-1px' }} />
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Two-column: Pass rate + System overview */}
-      <div className="grid-2">
+      <div className="grid-2" style={{ marginTop: 12 }}>
         {/* Pass Rate */}
         <div className="card">
           <div className="card-head">
@@ -145,8 +369,8 @@ const Dashboard: React.FC = () => {
           <div className="card-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 20px' }}>
             <KV label="Vaults" value={stats ? Number(stats.totalVaults).toString() : '0'} />
             <KV label="Validated" value={stats ? Number(stats.totalTxValidated).toString() : '0'} />
-            <KV label="PolicyEngine" value={shortenAddress(DEPLOYED_ADDRESSES.policyEngine)} mono />
-            <KV label="Treasury" value={shortenAddress(DEPLOYED_ADDRESSES.treasury)} mono />
+            <KV label="Your USDC" value={stats ? formatUSDC(stats.walletUSDC) : '$0.00'} />
+            <KV label="Allowance" value={stats ? formatUSDC(stats.walletAllowance) : '$0.00'} />
           </div>
         </div>
       </div>
@@ -155,14 +379,21 @@ const Dashboard: React.FC = () => {
       <div className="card" style={{ marginTop: 12 }}>
         <div className="card-head">
           <h3>Recent Screening Events</h3>
-          <button className="btn" onClick={fetchData}><IconRefresh style={{ width: 14, height: 14 }} /> Refresh</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <label className="auto-refresh" style={{ cursor: 'pointer' }}>
+              <span className={autoRefresh ? 'dot-live' : ''} style={autoRefresh ? { width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' } : { width: 6, height: 6, borderRadius: '50%', background: 'var(--text-3)' }} />
+              <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} style={{ display: 'none' }} />
+              Auto-refresh
+            </label>
+            <button className="btn" onClick={fetchData}><IconRefresh style={{ width: 14, height: 14 }} /> Refresh</button>
+          </div>
         </div>
         <div className="card-body">
           {events.length === 0 ? (
             <div className="empty">
               <IconActivity style={{ width: 32, height: 32 }} />
               <p>No screening events yet</p>
-              <p style={{ marginTop: 4 }}>Run <code>npx hardhat run scripts/demo.ts --network arbitrumSepolia</code></p>
+              <p style={{ marginTop: 4, fontSize: 12, color: 'var(--text-3)' }}>Use "Send Transfer" above or run <code>npx hardhat run scripts/demo.ts --network arbitrumSepolia</code></p>
             </div>
           ) : (
             <div className="timeline">
@@ -181,7 +412,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div className="tl-meta">
                     <span>To: <code>{shortenAddress(ev.to)}</code></span>
-                    <a href={`https://sepolia.arbiscan.io/tx/${ev.txHash}`} target="_blank" rel="noopener noreferrer">
+                    <a href={getExplorerUrl(ev.txHash)} target="_blank" rel="noopener noreferrer">
                       Arbiscan <IconExternalLink style={{ width: 11, height: 11, display: 'inline', verticalAlign: '-1px' }} />
                     </a>
                   </div>

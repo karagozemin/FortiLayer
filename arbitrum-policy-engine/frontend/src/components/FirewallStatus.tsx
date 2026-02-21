@@ -6,16 +6,19 @@ import {
   IconRefresh, IconExternalLink, IconShield, IconEngine,
   IconTreasury, IconArrowRight, IconPolicy, IconCheck,
 } from './Icons';
+import { useToast } from './Toast';
 
 const FirewallStatus: React.FC = () => {
   const { provider, address } = useWallet();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [txPending, setTxPending] = useState(false);
+  const [showConfirm, setShowConfirm] = useState<string | null>(null);
+  const [txPending, setTxPending] = useState('');
   const [m, setM] = useState({
     totalScreened: 0, totalPassed: 0, totalBlocked: 0,
     isPaused: false, isOwner: false, peAddr: '',
     pePaused: false, tPaused: false, vaultAuth: false, policyCount: 0,
+    peOwner: false, tOwner: false,
   });
 
   const fetchMetrics = useCallback(async () => {
@@ -26,18 +29,26 @@ const FirewallStatus: React.FC = () => {
       const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, provider);
 
-      const [screened, passed, blocked, fwPaused, fwOwner, peAddr, pePaused, tPaused, vaultAuth, policies] = await Promise.all([
+      const [screened, passed, blocked, fwPaused, fwOwner, peAddr, pePaused, peOwnerAddr, tPaused, tOwnerResult, vaultAuth, policies] = await Promise.all([
         fw.totalScreened(), fw.totalPassed(), fw.totalBlocked(),
         fw.paused(), fw.owner(), fw.policyEngine(),
-        pe.paused(), treasury.paused(),
+        pe.paused(), pe.owner(),
+        treasury.paused(),
+        provider.getCode(DEPLOYED_ADDRESSES.treasury).then(async () => {
+          const t = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ['function owner() view returns (address)'], provider);
+          return t.owner().catch(() => ethers.ZeroAddress);
+        }),
         fw.isVaultAuthorized(DEPLOYED_ADDRESSES.treasury),
         pe.getVaultPolicies(DEPLOYED_ADDRESSES.treasury).catch(() => []),
       ]);
 
+      const userAddr = address?.toLowerCase() || '';
       setM({
         totalScreened: Number(screened), totalPassed: Number(passed), totalBlocked: Number(blocked),
-        isPaused: fwPaused, isOwner: address ? fwOwner.toLowerCase() === address.toLowerCase() : false,
+        isPaused: fwPaused, isOwner: userAddr ? fwOwner.toLowerCase() === userAddr : false,
         peAddr, pePaused, tPaused, vaultAuth, policyCount: policies.length,
+        peOwner: userAddr ? peOwnerAddr.toLowerCase() === userAddr : false,
+        tOwner: userAddr ? (typeof tOwnerResult === 'string' ? tOwnerResult.toLowerCase() === userAddr : false) : false,
       });
     } catch (err) {
       console.error('FirewallStatus error:', err);
@@ -48,22 +59,61 @@ const FirewallStatus: React.FC = () => {
 
   useEffect(() => { fetchMetrics(); }, [fetchMetrics]);
 
-  const handleEmergencyToggle = async () => {
-    if (!provider || !showConfirm) { setShowConfirm(true); return; }
-    setTxPending(true);
+  const handleTogglePE = async () => {
+    if (!provider) return;
+    if (showConfirm !== 'pe') { setShowConfirm('pe'); return; }
+    setTxPending('pe');
     try {
       const signer = await provider.getSigner();
       const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, signer);
+      const action = m.pePaused ? 'unpause' : 'pause';
+      toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} PolicyEngine…`);
       const tx = m.pePaused ? await pe.unpause() : await pe.pause();
       await tx.wait();
-      setShowConfirm(false);
+      toast('success', `PolicyEngine ${action}d`);
+      setShowConfirm(null);
       await fetchMetrics();
     } catch (err: any) {
-      console.error('Emergency toggle error:', err);
-      alert(err?.reason || err?.message || 'Transaction failed');
-    } finally {
-      setTxPending(false);
-    }
+      toast('error', err?.reason || err?.shortMessage || err?.message || 'Transaction failed');
+    } finally { setTxPending(''); }
+  };
+
+  const handleToggleFW = async () => {
+    if (!provider) return;
+    if (showConfirm !== 'fw') { setShowConfirm('fw'); return; }
+    setTxPending('fw');
+    try {
+      const signer = await provider.getSigner();
+      const fw = new ethers.Contract(DEPLOYED_ADDRESSES.treasuryFirewall, ABIS.TreasuryFirewall, signer);
+      const action = m.isPaused ? 'unpause' : 'pause';
+      toast('pending', `${action === 'pause' ? 'Pausing' : 'Unpausing'} Firewall…`);
+      const tx = m.isPaused ? await fw.unpause() : await fw.pause();
+      await tx.wait();
+      toast('success', `TreasuryFirewall ${action}d`);
+      setShowConfirm(null);
+      await fetchMetrics();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || err?.message || 'Transaction failed');
+    } finally { setTxPending(''); }
+  };
+
+  const handleToggleTreasury = async () => {
+    if (!provider) return;
+    if (showConfirm !== 'treasury') { setShowConfirm('treasury'); return; }
+    setTxPending('treasury');
+    try {
+      const signer = await provider.getSigner();
+      const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
+      const action = m.tPaused ? 'emergencyUnpause' : 'emergencyPause';
+      toast('pending', `${m.tPaused ? 'Unpausing' : 'Pausing'} Treasury…`);
+      const tx = m.tPaused ? await treasury.emergencyUnpause() : await treasury.emergencyPause();
+      await tx.wait();
+      toast('success', `Treasury ${m.tPaused ? 'unpaused' : 'paused'}`);
+      setShowConfirm(null);
+      await fetchMetrics();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || err?.message || 'Transaction failed');
+    } finally { setTxPending(''); }
   };
 
   if (loading) {
@@ -72,6 +122,7 @@ const FirewallStatus: React.FC = () => {
 
   const systemOk = !m.isPaused && !m.pePaused && !m.tPaused;
   const passRate = m.totalScreened > 0 ? ((m.totalPassed / m.totalScreened) * 100).toFixed(1) : '100.0';
+  const canControl = m.isOwner || m.peOwner || m.tOwner;
 
   return (
     <>
@@ -125,7 +176,7 @@ const FirewallStatus: React.FC = () => {
             <HealthRow label="Treasury" value={m.tPaused ? 'PAUSED' : 'Active'} ok={!m.tPaused} />
             <HealthRow label="Vault Authorized" value={m.vaultAuth ? 'Yes' : 'No'} ok={m.vaultAuth} />
             <HealthRow label="Active Policies" value={m.policyCount.toString()} ok={m.policyCount > 0} />
-            <HealthRow label="Connected as Owner" value={m.isOwner ? 'Yes' : 'No'} ok={m.isOwner} />
+            <HealthRow label="Connected as Owner" value={canControl ? 'Yes' : 'No'} ok={canControl} />
           </div>
         </div>
 
@@ -168,34 +219,90 @@ const FirewallStatus: React.FC = () => {
       </div>
 
       {/* Emergency Controls */}
-      {m.isOwner && (
+      {canControl && (
         <div className="card" style={{ marginTop: 12, borderColor: 'rgba(239,68,68,.3)' }}>
           <div className="card-head">
             <h3 style={{ color: 'var(--red)' }}>Emergency Controls</h3>
           </div>
           <div className="card-body">
             <p style={{ color: 'var(--text-2)', fontSize: 13, marginBottom: 14 }}>
-              {m.pePaused
-                ? 'PolicyEngine is currently paused. All transactions are blocked.'
-                : 'Pause the PolicyEngine to immediately block all treasury transactions.'}
+              Toggle pause state for each contract. Paused contracts will reject all transactions.
             </p>
 
             {showConfirm && (
-              <div className="confirm-box">
-                <p className="cb-title">Confirm on-chain transaction</p>
-                <p className="cb-desc">
-                  This will {m.pePaused ? 'unpause' : 'pause'} the PolicyEngine on Arbitrum Sepolia.
+              <div className="confirm-box" style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 'var(--radius)', background: 'var(--red-dim)', border: '1px solid rgba(239,68,68,.2)' }}>
+                <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--red)', marginBottom: 4 }}>Confirm on-chain transaction</p>
+                <p style={{ fontSize: 12, color: 'var(--text-2)' }}>
+                  {showConfirm === 'pe' && `This will ${m.pePaused ? 'unpause' : 'pause'} the PolicyEngine.`}
+                  {showConfirm === 'fw' && `This will ${m.isPaused ? 'unpause' : 'pause'} the TreasuryFirewall.`}
+                  {showConfirm === 'treasury' && `This will ${m.tPaused ? 'unpause' : 'pause'} the Treasury.`}
                 </p>
               </div>
             )}
 
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className={`btn ${m.pePaused ? 'btn-blue' : 'btn-red'}`} onClick={handleEmergencyToggle} disabled={txPending}>
-                {txPending ? 'Sending…' : showConfirm ? 'Confirm' : m.pePaused ? 'Unpause Engine' : 'Emergency Pause'}
-              </button>
-              {showConfirm && (
-                <button className="btn" onClick={() => setShowConfirm(false)}>Cancel</button>
-              )}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* PolicyEngine */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>PolicyEngine</span>
+                  <span className={`chip ${m.pePaused ? 'chip-red' : 'chip-green'}`} style={{ marginLeft: 8 }}>
+                    {m.pePaused ? 'Paused' : 'Active'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className={`btn ${m.pePaused ? 'btn-blue' : 'btn-red'}`}
+                    onClick={handleTogglePE}
+                    disabled={!!txPending}
+                    style={{ fontSize: 12 }}
+                  >
+                    {txPending === 'pe' ? 'Sending…' : showConfirm === 'pe' ? 'Confirm' : m.pePaused ? 'Unpause' : 'Pause'}
+                  </button>
+                  {showConfirm === 'pe' && <button className="btn" onClick={() => setShowConfirm(null)} style={{ fontSize: 12 }}>Cancel</button>}
+                </div>
+              </div>
+
+              {/* TreasuryFirewall */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>TreasuryFirewall</span>
+                  <span className={`chip ${m.isPaused ? 'chip-red' : 'chip-green'}`} style={{ marginLeft: 8 }}>
+                    {m.isPaused ? 'Paused' : 'Active'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className={`btn ${m.isPaused ? 'btn-blue' : 'btn-red'}`}
+                    onClick={handleToggleFW}
+                    disabled={!!txPending}
+                    style={{ fontSize: 12 }}
+                  >
+                    {txPending === 'fw' ? 'Sending…' : showConfirm === 'fw' ? 'Confirm' : m.isPaused ? 'Unpause' : 'Pause'}
+                  </button>
+                  {showConfirm === 'fw' && <button className="btn" onClick={() => setShowConfirm(null)} style={{ fontSize: 12 }}>Cancel</button>}
+                </div>
+              </div>
+
+              {/* Treasury */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+                <div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-1)' }}>Treasury</span>
+                  <span className={`chip ${m.tPaused ? 'chip-red' : 'chip-green'}`} style={{ marginLeft: 8 }}>
+                    {m.tPaused ? 'Paused' : 'Active'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    className={`btn ${m.tPaused ? 'btn-blue' : 'btn-red'}`}
+                    onClick={handleToggleTreasury}
+                    disabled={!!txPending}
+                    style={{ fontSize: 12 }}
+                  >
+                    {txPending === 'treasury' ? 'Sending…' : showConfirm === 'treasury' ? 'Confirm' : m.tPaused ? 'Unpause' : 'Pause'}
+                  </button>
+                  {showConfirm === 'treasury' && <button className="btn" onClick={() => setShowConfirm(null)} style={{ fontSize: 12 }}>Cancel</button>}
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
 import { useWallet } from '../hooks/useWallet';
 import { DEPLOYED_ADDRESSES, ABIS, shortenAddress } from '../utils/contracts';
-import { IconRefresh, IconExternalLink } from './Icons';
+import { IconRefresh, IconExternalLink, IconPlus, IconTrash, IconChevronDown } from './Icons';
+import { useToast } from './Toast';
 
 interface PolicyData {
   address: string;
@@ -24,10 +25,24 @@ const STYLE: Record<string, { icon: string; color: string; bg: string }> = {
 
 const PolicyManager: React.FC = () => {
   const { provider } = useWallet();
+  const { toast } = useToast();
   const [policies, setPolicies] = useState<PolicyData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [whitelistAddrs, setWhitelistAddrs] = useState<string[]>([]);
+  const [openAction, setOpenAction] = useState<string | null>(null);
+  const [txPending, setTxPending] = useState('');
 
-  const fetch = useCallback(async () => {
+  // Form states
+  const [wlAddr, setWlAddr] = useState('');
+  const [wlRemoveAddr, setWlRemoveAddr] = useState('');
+  const [slDailyLimit, setSlDailyLimit] = useState('');
+  const [slMaxTx, setSlMaxTx] = useState('');
+  const [rsAddr, setRsAddr] = useState('');
+  const [rsScore, setRsScore] = useState('');
+  const [rsThreshold, setRsThreshold] = useState('');
+  const [tlDuration, setTlDuration] = useState('');
+
+  const fetchPolicies = useCallback(async () => {
     if (!provider) return;
     setLoading(true);
     try {
@@ -64,13 +79,14 @@ const PolicyManager: React.FC = () => {
         const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, provider);
         const [name, list] = await Promise.all([c.policyName(), c.getVaultWhitelist(vault)]);
         const s = STYLE.WhitelistPolicy;
+        setWhitelistAddrs(list);
         res.push({
           address: DEPLOYED_ADDRESSES.whitelistPolicy, name,
           color: s.color, bgColor: s.bg, icon: s.icon,
           active: activeSet.has(DEPLOYED_ADDRESSES.whitelistPolicy.toLowerCase()),
           params: [
             { label: 'Whitelisted', value: `${list.length} addresses` },
-            ...list.slice(0, 2).map((a: string, i: number) => ({ label: `#${i + 1}`, value: shortenAddress(a) })),
+            ...list.slice(0, 3).map((a: string, i: number) => ({ label: `#${i + 1}`, value: shortenAddress(a) })),
           ],
         });
       }
@@ -142,7 +158,130 @@ const PolicyManager: React.FC = () => {
     }
   }, [provider]);
 
-  useEffect(() => { fetch(); }, [fetch]);
+  useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
+
+  // ── Action Handlers ──────────────
+  const handleAddWhitelist = async () => {
+    if (!provider || !wlAddr) return;
+    setTxPending('wl-add');
+    try {
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, signer);
+      toast('pending', 'Adding to whitelist…');
+      const tx = await c.addToVaultWhitelist(DEPLOYED_ADDRESSES.treasury, wlAddr);
+      await tx.wait();
+      toast('success', `Added ${shortenAddress(wlAddr)} to whitelist`);
+      setWlAddr('');
+      await fetchPolicies();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || 'Failed to add');
+    } finally { setTxPending(''); }
+  };
+
+  const handleRemoveWhitelist = async (addr: string) => {
+    if (!provider) return;
+    setTxPending('wl-remove');
+    try {
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, signer);
+      toast('pending', 'Removing from whitelist…');
+      const tx = await c.removeFromVaultWhitelist(DEPLOYED_ADDRESSES.treasury, addr);
+      await tx.wait();
+      toast('success', `Removed ${shortenAddress(addr)} from whitelist`);
+      setWlRemoveAddr('');
+      await fetchPolicies();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || 'Failed to remove');
+    } finally { setTxPending(''); }
+  };
+
+  const handleSetDailyLimit = async () => {
+    if (!provider || !slDailyLimit) return;
+    setTxPending('sl-daily');
+    try {
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, signer);
+      const amt = ethers.parseUnits(slDailyLimit, 6);
+      toast('pending', 'Setting daily limit…');
+      const tx = await c.setVaultDailyLimit(DEPLOYED_ADDRESSES.treasury, amt);
+      await tx.wait();
+      toast('success', `Daily limit set to ${slDailyLimit} USDC`);
+      setSlDailyLimit('');
+      await fetchPolicies();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || 'Failed');
+    } finally { setTxPending(''); }
+  };
+
+  const handleSetMaxTx = async () => {
+    if (!provider || !slMaxTx) return;
+    setTxPending('sl-max');
+    try {
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(DEPLOYED_ADDRESSES.spendingLimitPolicy, ABIS.SpendingLimitPolicy, signer);
+      const amt = ethers.parseUnits(slMaxTx, 6);
+      toast('pending', 'Setting max per tx…');
+      const tx = await c.setVaultMaxTxAmount(DEPLOYED_ADDRESSES.treasury, amt);
+      await tx.wait();
+      toast('success', `Max per tx set to ${slMaxTx} USDC`);
+      setSlMaxTx('');
+      await fetchPolicies();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || 'Failed');
+    } finally { setTxPending(''); }
+  };
+
+  const handleSetRiskScore = async () => {
+    if (!provider || !rsAddr || !rsScore) return;
+    setTxPending('rs-score');
+    try {
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, signer);
+      toast('pending', 'Setting risk score…');
+      const tx = await c.setRiskScore(rsAddr, Number(rsScore));
+      await tx.wait();
+      toast('success', `Risk score for ${shortenAddress(rsAddr)} set to ${rsScore}`);
+      setRsAddr('');
+      setRsScore('');
+      await fetchPolicies();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || 'Failed');
+    } finally { setTxPending(''); }
+  };
+
+  const handleSetThreshold = async () => {
+    if (!provider || !rsThreshold) return;
+    setTxPending('rs-thresh');
+    try {
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(DEPLOYED_ADDRESSES.riskScorePolicy, ABIS.RiskScorePolicy, signer);
+      toast('pending', 'Setting min threshold…');
+      const tx = await c.setMinThreshold(Number(rsThreshold));
+      await tx.wait();
+      toast('success', `Min threshold set to ${rsThreshold}`);
+      setRsThreshold('');
+      await fetchPolicies();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || 'Failed');
+    } finally { setTxPending(''); }
+  };
+
+  const handleSetTimelockDuration = async () => {
+    if (!provider || !tlDuration) return;
+    setTxPending('tl-dur');
+    try {
+      const signer = await provider.getSigner();
+      const c = new ethers.Contract(DEPLOYED_ADDRESSES.timelockPolicy, ABIS.TimelockPolicy, signer);
+      toast('pending', 'Setting timelock duration…');
+      const tx = await c.setVaultTimelockDuration(DEPLOYED_ADDRESSES.treasury, Number(tlDuration));
+      await tx.wait();
+      toast('success', `Timelock duration set to ${tlDuration}s`);
+      setTlDuration('');
+      await fetchPolicies();
+    } catch (err: any) {
+      toast('error', err?.reason || err?.shortMessage || 'Failed');
+    } finally { setTxPending(''); }
+  };
 
   if (loading) {
     return <div className="loading"><div className="spinner" /><p>Reading policy state…</p></div>;
@@ -166,46 +305,130 @@ const PolicyManager: React.FC = () => {
               }} />
             </div>
           </div>
-          <button className="btn" onClick={fetch}><IconRefresh style={{ width: 14, height: 14 }} /> Refresh</button>
+          <button className="btn" onClick={fetchPolicies}><IconRefresh style={{ width: 14, height: 14 }} /> Refresh</button>
         </div>
       </div>
 
       {/* Policy cards */}
       <div className="policy-grid">
-        {policies.map((p) => (
-          <div key={p.address} className={`policy-card ${!p.active ? 'inactive' : ''}`}>
-            <div className="policy-card-head">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className="policy-icon-box" style={{ background: p.bgColor, color: p.color, width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700 }}>
-                  {p.icon}
+        {policies.map((p) => {
+          const isWL = p.name === 'WhitelistPolicy';
+          const isSL = p.name === 'SpendingLimitPolicy';
+          const isRS = p.name === 'RiskScorePolicy';
+          const isTL = p.name === 'TimelockPolicy';
+          const actionKey = p.name;
+
+          return (
+            <div key={p.address} className={`policy-card ${!p.active ? 'inactive' : ''}`}>
+              <div className="policy-card-head">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="policy-icon-box" style={{ background: p.bgColor, color: p.color, width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700 }}>
+                    {p.icon}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-0)' }}>{p.name}</div>
+                    <span className={`chip ${p.active ? 'chip-green' : 'chip-amber'}`} style={{ marginTop: 3 }}>
+                      {p.active ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-0)' }}>{p.name}</div>
-                  <span className={`chip ${p.active ? 'chip-green' : 'chip-amber'}`} style={{ marginTop: 3 }}>
-                    {p.active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
+                <code style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{shortenAddress(p.address)}</code>
               </div>
-              <code style={{ fontSize: 10.5, color: 'var(--text-3)' }}>{shortenAddress(p.address)}</code>
-            </div>
 
-            <div className="policy-card-body">
-              {p.params.map((param, i) => (
-                <div key={i} className="policy-param">
-                  <span className="p-label">{param.label}</span>
-                  <span className="p-value">{param.value}</span>
-                </div>
-              ))}
-            </div>
+              <div className="policy-card-body">
+                {p.params.map((param, i) => (
+                  <div key={i} className="policy-param">
+                    <span className="p-label">{param.label}</span>
+                    <span className="p-value">{param.value}</span>
+                  </div>
+                ))}
 
-            <div className="policy-card-foot">
-              <a href={`https://sepolia.arbiscan.io/address/${p.address}#code`} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 4 }}>
-                View on Arbiscan <IconExternalLink style={{ width: 11, height: 11 }} />
-              </a>
+                {/* ── Whitelist Actions ── */}
+                {isWL && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="inline-action">
+                      <input className="input mono" placeholder="0x… address to add" value={wlAddr} onChange={e => setWlAddr(e.target.value)} style={{ flex: 1 }} />
+                      <button className="btn btn-green" onClick={handleAddWhitelist} disabled={!!txPending || !wlAddr} style={{ fontSize: 12 }}>
+                        <IconPlus style={{ width: 13, height: 13 }} /> {txPending === 'wl-add' ? 'Adding…' : 'Add'}
+                      </button>
+                    </div>
+
+                    {/* Show current whitelist with remove buttons */}
+                    {whitelistAddrs.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-3)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '.04em', fontWeight: 600 }}>Current Whitelist</div>
+                        {whitelistAddrs.map((a, i) => (
+                          <div key={i} className="inline-action" style={{ padding: '6px 0' }}>
+                            <code style={{ fontSize: 11.5, flex: 1 }}>{shortenAddress(a)}</code>
+                            <button className="btn btn-red" onClick={() => handleRemoveWhitelist(a)} disabled={!!txPending} style={{ fontSize: 11, padding: '4px 8px' }}>
+                              <IconTrash style={{ width: 12, height: 12 }} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Spending Limit Actions ── */}
+                {isSL && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="inline-action">
+                      <input className="input" type="number" placeholder="Daily limit (USDC)" value={slDailyLimit} onChange={e => setSlDailyLimit(e.target.value)} style={{ flex: 1 }} />
+                      <button className="btn btn-blue" onClick={handleSetDailyLimit} disabled={!!txPending || !slDailyLimit} style={{ fontSize: 12 }}>
+                        {txPending === 'sl-daily' ? 'Setting…' : 'Set Daily Limit'}
+                      </button>
+                    </div>
+                    <div className="inline-action">
+                      <input className="input" type="number" placeholder="Max per tx (USDC)" value={slMaxTx} onChange={e => setSlMaxTx(e.target.value)} style={{ flex: 1 }} />
+                      <button className="btn btn-blue" onClick={handleSetMaxTx} disabled={!!txPending || !slMaxTx} style={{ fontSize: 12 }}>
+                        {txPending === 'sl-max' ? 'Setting…' : 'Set Max Tx'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Risk Score Actions ── */}
+                {isRS && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="inline-action" style={{ flexWrap: 'wrap', gap: 6 }}>
+                      <input className="input mono" placeholder="0x… address" value={rsAddr} onChange={e => setRsAddr(e.target.value)} style={{ flex: 2, minWidth: 140 }} />
+                      <input className="input" type="number" placeholder="Score (0-100)" value={rsScore} onChange={e => setRsScore(e.target.value)} style={{ flex: 1, minWidth: 80 }} />
+                      <button className="btn btn-blue" onClick={handleSetRiskScore} disabled={!!txPending || !rsAddr || !rsScore} style={{ fontSize: 12 }}>
+                        {txPending === 'rs-score' ? 'Setting…' : 'Set Score'}
+                      </button>
+                    </div>
+                    <div className="inline-action">
+                      <input className="input" type="number" placeholder="Min threshold (e.g. 50)" value={rsThreshold} onChange={e => setRsThreshold(e.target.value)} style={{ flex: 1 }} />
+                      <button className="btn btn-blue" onClick={handleSetThreshold} disabled={!!txPending || !rsThreshold} style={{ fontSize: 12 }}>
+                        {txPending === 'rs-thresh' ? 'Setting…' : 'Set Threshold'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Timelock Actions ── */}
+                {isTL && (
+                  <div style={{ marginTop: 12 }}>
+                    <div className="inline-action">
+                      <input className="input" type="number" placeholder="Duration (seconds)" value={tlDuration} onChange={e => setTlDuration(e.target.value)} style={{ flex: 1 }} />
+                      <button className="btn btn-blue" onClick={handleSetTimelockDuration} disabled={!!txPending || !tlDuration} style={{ fontSize: 12 }}>
+                        {txPending === 'tl-dur' ? 'Setting…' : 'Set Duration'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="policy-card-foot">
+                <a href={`https://sepolia.arbiscan.io/address/${p.address}#code`} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  View on Arbiscan <IconExternalLink style={{ width: 11, height: 11 }} />
+                </a>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
