@@ -118,6 +118,9 @@ async function main() {
   console.log("   → Adding RiskScorePolicy to vault...");
   await (await policyEngine.addPolicy(treasuryAddr, riskScoreAddr)).wait();
 
+  console.log("   → Adding TimelockPolicy to vault...");
+  await (await policyEngine.addPolicy(treasuryAddr, timelockAddr)).wait();
+
   // Register policies in the global registry
   console.log("   → Registering policies in PolicyRegistry...");
   await (await registry.registerPolicy(spendingLimitAddr)).wait();
