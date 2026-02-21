@@ -185,7 +185,7 @@ const FirewallStatus: React.FC = () => {
             {Object.entries(DEPLOYED_ADDRESSES).filter(([, v]) => v).map(([key, addr]) => (
               <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '7px 0', borderBottom: '1px solid var(--border)' }}>
                 <span style={{ color: 'var(--text-3)', fontSize: 12 }}>{key}</span>
-                <a href={`https://sepolia.arbiscan.io/address/${addr}#code`} target="_blank" rel="noopener noreferrer"
+                <a href={`https://sepolia.arbiscan.io/address/${addr}`} target="_blank" rel="noopener noreferrer"
                   style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
                   {shortenAddress(addr)} <IconExternalLink style={{ width: 10, height: 10 }} />
                 </a>

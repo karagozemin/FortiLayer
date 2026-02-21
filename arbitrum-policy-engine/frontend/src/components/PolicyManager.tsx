@@ -437,7 +437,7 @@ const PolicyManager: React.FC = () => {
               </div>
 
               <div className="policy-card-foot">
-                <a href={`https://sepolia.arbiscan.io/address/${p.address}#code`} target="_blank" rel="noopener noreferrer"
+                <a href={`https://sepolia.arbiscan.io/address/${p.address}`} target="_blank" rel="noopener noreferrer"
                   style={{ fontSize: 11.5, display: 'flex', alignItems: 'center', gap: 4 }}>
                   View on Arbiscan <IconExternalLink style={{ width: 11, height: 11 }} />
                 </a>
