@@ -207,28 +207,44 @@ const Dashboard: React.FC = () => {
 
       const GENERIC_POLICY_ABI = [
         'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
-        'function policyName() pure returns (string)',
+        'function policyName() view returns (string)',
       ];
+
+      // Map known addresses to readable names for better error messages
+      const KNOWN_NAMES: Record<string, string> = {
+        [DEPLOYED_ADDRESSES.spendingLimitPolicy.toLowerCase()]: 'SpendingLimitPolicy (Stylus)',
+        [DEPLOYED_ADDRESSES.whitelistPolicy.toLowerCase()]: 'WhitelistPolicy',
+        [DEPLOYED_ADDRESSES.timelockPolicy.toLowerCase()]: 'TimelockPolicy',
+        [DEPLOYED_ADDRESSES.multiSigPolicy.toLowerCase()]: 'MultiSigPolicy',
+        [DEPLOYED_ADDRESSES.riskScorePolicy.toLowerCase()]: 'RiskScorePolicy',
+      };
+
+      // Known revert reason hints for user-friendly messages
+      const KNOWN_HINTS: Record<string, string> = {
+        [DEPLOYED_ADDRESSES.whitelistPolicy.toLowerCase()]: 'Recipient address is not whitelisted. Add it in Policy Manager first.',
+        [DEPLOYED_ADDRESSES.multiSigPolicy.toLowerCase()]: `Requires signer approval. Auto-approve may have failed — check if you are a registered signer.`,
+      };
 
       const failures: string[] = [];
       for (const pAddr of policyAddrs) {
+        const key = pAddr.toLowerCase();
         const pc = new ethers.Contract(pAddr, GENERIC_POLICY_ABI, provider);
         try {
           const ok = await pc.validate(DEPLOYED_ADDRESSES.treasury, DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt);
           if (!ok) {
-            let name = shortenAddress(pAddr);
-            try { name = await pc.policyName(); } catch {}
+            const name = KNOWN_NAMES[key] || shortenAddress(pAddr);
             failures.push(`${name}: validation returned false`);
           }
         } catch (pErr: any) {
-          let name = shortenAddress(pAddr);
-          try { name = await pc.policyName(); } catch {}
+          const name = KNOWN_NAMES[key] || shortenAddress(pAddr);
 
-          // Extract human-readable reason from revert
-          let reason = 'validation reverted';
-          if (pErr?.reason) reason = pErr.reason;
-          else if (pErr?.shortMessage) reason = pErr.shortMessage.replace('execution reverted: ', '');
-          else if (pErr?.message && pErr.message.length < 200) reason = pErr.message;
+          // Use known hint if available, otherwise extract from error
+          let reason = KNOWN_HINTS[key] || '';
+          if (!reason) {
+            if (pErr?.reason) reason = pErr.reason;
+            else if (pErr?.shortMessage) reason = pErr.shortMessage.replace('execution reverted: ', '');
+            else reason = 'validation reverted';
+          }
 
           failures.push(`${name}: ${reason}`);
         }
