@@ -115,14 +115,54 @@ const Landing: React.FC = () => {
             </div>
           ))}
         </div>
+
+        {/* Tech Stack Badges */}
+        <div className="landing-tech-badges">
+          {['Rust', 'Solidity', 'Arbitrum Stylus', 'Chainlink', 'WASM', 'TypeScript'].map((t) => (
+            <span key={t} className="landing-tech-badge">{t}</span>
+          ))}
+        </div>
       </section>
 
-      {/* Features */}
+      {/* How It Works — Numbered Steps */}
       <section className="landing-section">
         <h2 className="landing-section-title">How It Works</h2>
         <p className="landing-section-sub">
           A modular policy engine sits between your treasury and the blockchain.
           No transaction executes without passing every active policy.
+        </p>
+        <div className="landing-steps">
+          <div className="landing-step">
+            <div className="landing-step-num">1</div>
+            <h3>Initiate Transfer</h3>
+            <p>A treasury outflow is requested — token, amount, and destination are submitted to the vault.</p>
+          </div>
+          <div className="landing-step-connector" />
+          <div className="landing-step">
+            <div className="landing-step-num">2</div>
+            <h3>Firewall Intercepts</h3>
+            <p>TreasuryFirewall catches the call and routes it to the PolicyEngine for validation.</p>
+          </div>
+          <div className="landing-step-connector" />
+          <div className="landing-step">
+            <div className="landing-step-num">3</div>
+            <h3>Policies Evaluate</h3>
+            <p>Each active policy — spending limit, whitelist, timelock, multi-sig, risk score — votes pass or fail.</p>
+          </div>
+          <div className="landing-step-connector" />
+          <div className="landing-step">
+            <div className="landing-step-num">4</div>
+            <h3>Execute or Block</h3>
+            <p>If all policies pass, the transfer executes. If any fails, the transaction is blocked and logged.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="landing-section">
+        <h2 className="landing-section-title">Core Capabilities</h2>
+        <p className="landing-section-sub">
+          Six composable policy modules, each independently deployable and verifiable.
         </p>
         <div className="landing-features">
           {FEATURES.map((f) => (
@@ -134,6 +174,54 @@ const Landing: React.FC = () => {
               <p>{f.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Stylus Advantage */}
+      <section className="landing-section">
+        <h2 className="landing-section-title">The Stylus Advantage</h2>
+        <p className="landing-section-sub">
+          Same policy logic, dramatically less gas. Rust compiles to WASM and runs natively on Arbitrum Stylus.
+        </p>
+        <div className="landing-stylus">
+          <div className="landing-stylus-card">
+            <div className="landing-stylus-header">
+              <span className="landing-stylus-label sol">Solidity</span>
+              <span className="landing-stylus-label rust">Rust / Stylus</span>
+            </div>
+            <div className="landing-stylus-bars">
+              <div className="landing-bar-row">
+                <span className="landing-bar-label">SpendingLimitPolicy</span>
+                <div className="landing-bar-track">
+                  <div className="landing-bar sol" style={{ width: '100%' }}>
+                    <span>~45,000 gas</span>
+                  </div>
+                </div>
+                <div className="landing-bar-track">
+                  <div className="landing-bar rust" style={{ width: '11%' }}>
+                    <span>4,800 gas</span>
+                  </div>
+                </div>
+              </div>
+              <div className="landing-bar-row">
+                <span className="landing-bar-label">Deployment Size</span>
+                <div className="landing-bar-track">
+                  <div className="landing-bar sol" style={{ width: '100%' }}>
+                    <span>~8.2 KB</span>
+                  </div>
+                </div>
+                <div className="landing-bar-track">
+                  <div className="landing-bar rust" style={{ width: '25%' }}>
+                    <span>~2.1 KB</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="landing-stylus-savings">
+              <span className="landing-savings-badge">🔥 ~9x gas reduction</span>
+              <span className="landing-savings-badge">📦 ~4x smaller bytecode</span>
+            </div>
+          </div>
         </div>
       </section>
 
