@@ -172,11 +172,38 @@ const Dashboard: React.FC = () => {
       const treasury = new ethers.Contract(DEPLOYED_ADDRESSES.treasury, ABIS.Treasury, signer);
       const amt = ethers.parseUnits(sendAmount, 6);
 
+      // ── Auto-approve MultiSig (if active) ─────────────────
+      // So the user doesn't need to manually go to Policies page
+      try {
+        const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
+        const policyAddrs: string[] = await pe.getVaultPolicies(DEPLOYED_ADDRESSES.treasury);
+        const msAddr = DEPLOYED_ADDRESSES.multiSigPolicy.toLowerCase();
+
+        if (policyAddrs.some(a => a.toLowerCase() === msAddr)) {
+          const ms = new ethers.Contract(DEPLOYED_ADDRESSES.multiSigPolicy, ABIS.MultiSigPolicy, signer);
+          const txHash = await ms.getTransactionHash(DEPLOYED_ADDRESSES.treasury, DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt);
+          const signerAddr = await signer.getAddress();
+          const alreadyApproved = await ms.approvals(txHash, signerAddr);
+
+          if (!alreadyApproved) {
+            toast('pending', 'Auto-approving MultiSig…');
+            const approveTx = await ms.approveTransaction(
+              DEPLOYED_ADDRESSES.treasury, DEPLOYED_ADDRESSES.mockUSDC, sendTo, amt, GAS_OVERRIDES
+            );
+            await waitForTx(approveTx);
+            toast('success', 'MultiSig approved ✓');
+          }
+        }
+      } catch (msErr: any) {
+        console.warn('MultiSig auto-approve skipped:', msErr.message);
+        // Continue — vault might not have MultiSig, or signer is not a registered signer
+      }
+
       // ── Pre-flight policy validation ──────────────────────
       // Check each active policy BEFORE sending the tx to avoid wasting gas
       toast('pending', 'Validating policies…');
-      const pe = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
-      const policyAddrs: string[] = await pe.getVaultPolicies(DEPLOYED_ADDRESSES.treasury);
+      const pe2 = new ethers.Contract(DEPLOYED_ADDRESSES.policyEngine, ABIS.PolicyEngine, provider);
+      const policyAddrs: string[] = await pe2.getVaultPolicies(DEPLOYED_ADDRESSES.treasury);
 
       const GENERIC_POLICY_ABI = [
         'function validate(address vault, address token, address to, uint256 amount) view returns (bool)',
