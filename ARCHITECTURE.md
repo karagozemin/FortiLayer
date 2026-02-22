@@ -23,9 +23,10 @@
   - [TimelockPolicy](#timelockpolicy)
   - [MultiSigPolicy](#multisigpolicy)
   - [RiskScorePolicy](#riskscorepolicy)
-  - [OracleRiskScorePolicy](#oracleriskscorpolicy)
+  - [OracleRiskScorePolicy](#oracleriskscorepolicy)
 - [Registry](#registry)
 - [Stylus WASM Layer](#stylus-wasm-layer)
+- [Access Control Model](#access-control-model)
 - [Security Model](#security-model)
 - [Gas Optimization](#gas-optimization)
 - [Interface Specifications](#interface-specifications)
@@ -53,8 +54,8 @@ FortiLayer is a **multi-contract execution firewall** that sits between an insti
 │  │                                                              │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │   │
 │  │  │ Spending │ │ Whitelist│ │ Timelock │ │ MultiSig │       │   │
-│  │  │  Limit   │ │          │ │          │ │          │       │   │
-│  │  │(+Stylus) │ │          │ │          │ │          │       │   │
+│  │  │  Limit   │ │          │ │          │ │  2-of-N  │       │   │
+│  │  │🦀 Stylus │ │          │ │          │ │          │       │   │
 │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │   │
 │  │  ┌──────────┐ ┌──────────┐                                  │   │
 │  │  │  Risk    │ │  Oracle  │                                  │   │
@@ -78,8 +79,9 @@ FortiLayer is a **multi-contract execution firewall** that sits between an insti
 1. **AND-logic enforcement** — Every attached policy must pass. Strictest policy wins.
 2. **Two-phase validation** — `validate()` (view) → `recordTransaction()` (state). Zero state pollution on failure.
 3. **Per-vault configuration** — Each vault has its own policy set and configuration.
-4. **Hot-swappable policies** — Add/remove policies without redeploying the vault.
+4. **Hot-swappable policies** — Add/remove policies without redeploying the vault (e.g., Solidity → Stylus swap performed on-chain).
 5. **No direct token access** — Tokens are held by Treasury; only the firewall can move them.
+6. **Full access control** — All administrative functions gated by onlyOwner, onlyVaultOwner, or RBAC roles.
 
 ---
 
@@ -122,8 +124,13 @@ User
  │   │   ├── PHASE 1: VALIDATE (view calls — no state change)
  │   │   │   ├── for each policy in vault.policies:
  │   │   │   │   └── IPolicy(policy).validate(vault, token, to, amount)
- │   │   │   │       ├── ✅ pass → continue
- │   │   │   │       └── ❌ revert → TransactionNotCompliant
+ │   │   │   │       ├── Policy[0]: MultiSigPolicy (2-of-N approval check)
+ │   │   │   │       ├── Policy[1]: WhitelistPolicy (recipient check)
+ │   │   │   │       ├── Policy[2]: RiskScorePolicy (address scoring)
+ │   │   │   │       ├── Policy[3]: TimelockPolicy (cooldown check)
+ │   │   │   │       └── Policy[4]: SpendingLimitPolicy 🦀 (Stylus WASM)
+ │   │   │   │           ├── ✅ pass → continue
+ │   │   │   │           └── ❌ revert → TransactionNotCompliant
  │   │   │   │
  │   │   ├── PHASE 2: RECORD (state mutation — only if ALL validated)
  │   │   │   ├── for each policy in vault.policies:
@@ -227,9 +234,10 @@ Phase 2: recordTransaction() — Only runs if ALL policies pass
          ┌───────────────┼───────────────────────┐
          ▼               ▼                       ▼
    ┌───────────┐  ┌───────────┐           ┌───────────┐
-   │BasePolicy │  │BasePolicy │    ...    │BasePolicy │
-   │  ├─ Spend │  │  ├─ White │           │  ├─Oracle │
-   │  │  Limit │  │  │  list  │           │  │  Risk  │
+   │ Stylus 🦀 │  │BasePolicy │    ...    │BasePolicy │
+   │ Spending  │  │  ├─ White │           │  ├─Oracle │
+   │  Limit    │  │  │  list  │           │  │  Risk  │
+   │ (WASM)    │  │  │        │           │  │  (CL)  │
    └───────────┘  └───────────┘           └─────┬─────┘
                                                  │ reads
                                                  ▼
@@ -279,10 +287,15 @@ struct VaultConfig {
 | Function | Modifiers | Description |
 |---|---|---|
 | `registerVault(vault)` | `whenNotPaused` | Registers a new vault with msg.sender as owner |
-| `addPolicy(vault, policy)` | `whenNotPaused`, `vaultExists` | Attaches a policy to a vault's pipeline |
-| `removePolicy(vault, policy)` | `whenNotPaused`, `vaultExists` | Detaches policy (swap-and-pop removal) |
+| `addPolicy(vault, policy)` | `whenNotPaused`, `onlyVaultOwner`, `vaultExists` | Attaches a policy to a vault's pipeline |
+| `removePolicy(vault, policy)` | `whenNotPaused`, `onlyVaultOwner`, `vaultExists` | Detaches policy (swap-and-pop removal) |
 | `validateTransaction(vault, token, to, amount)` | `whenNotPaused`, `nonReentrant`, `vaultExists` | **Core** — Phase 1: validate all → Phase 2: record all |
 | `pause()` / `unpause()` | `onlyOwner` | Emergency circuit breaker |
+
+#### Access Control
+
+- **`onlyVaultOwner(vault)`**: Enforces `msg.sender == _vaults[vault].owner`. Only the vault's registered owner can add/remove policies.
+- **`onlyOwner`**: Only the contract owner can pause/unpause the engine.
 
 #### Events
 
@@ -298,6 +311,7 @@ struct VaultConfig {
 - `VaultAlreadyRegistered(vault)`
 - `PolicyAlreadyRegistered(vault, policy)`
 - `PolicyNotRegistered(vault, policy)`
+- `NotVaultOwner(caller, vault)`
 - `TransactionNotCompliant(policy, reason)`
 
 ---
@@ -325,6 +339,7 @@ struct VaultConfig {
 | `screenAndExecute(vault, token, to, amount)` | `whenNotPaused`, `nonReentrant`, `onlyAuthorizedVault` | Validates via engine → executes `safeTransferFrom` |
 | `authorizeVault(vault)` | `onlyOwner` | Whitelists a vault |
 | `revokeVault(vault)` | `onlyOwner` | Removes vault authorization |
+| `setPolicyEngine(engine)` | `onlyOwner` | Updates engine reference |
 | `pause()` / `unpause()` | `onlyOwner` | Emergency circuit breaker |
 
 #### Metrics
@@ -355,6 +370,8 @@ The firewall tracks pass/block metrics on-chain:
 |---|---|---|
 | `execute(token, to, amount)` | `onlyRole(EXECUTOR_ROLE)`, `nonReentrant` | Executes `safeTransferFrom`, returns `txId = keccak256(nonce, token, to, amount, sender, timestamp)` |
 
+> **Note:** TransactionExecutor is deployed and available as an alternative execution path but is not in the primary vault flow. The TreasuryFirewall handles execution directly via `safeTransferFrom`.
+
 ---
 
 ### Treasury
@@ -365,11 +382,11 @@ The firewall tracks pass/block metrics on-chain:
 
 #### Roles (RBAC)
 
-| Role | Purpose |
-|---|---|
-| `ADMIN_ROLE` | Contract configuration |
-| `EXECUTOR_ROLE` | Can initiate transfers |
-| `PAUSER_ROLE` | Emergency pause/unpause |
+| Role | Purpose | Guard |
+|---|---|---|
+| `ADMIN_ROLE` | Contract configuration, emergency unpause, emergency withdraw | `onlyRole(ADMIN_ROLE)` |
+| `EXECUTOR_ROLE` | Can initiate transfers | — |
+| `PAUSER_ROLE` | Emergency pause | `onlyRole(PAUSER_ROLE)` |
 
 #### Key Functions
 
@@ -378,7 +395,11 @@ The firewall tracks pass/block metrics on-chain:
 | `deposit(token, amount)` | `whenNotPaused` | Accepts ERC-20 deposits into vault |
 | `requestTransfer(token, to, amount)` | `whenNotPaused`, `nonReentrant` | Checks balance → approves firewall → calls `screenAndExecute` |
 | `emergencyPause()` | `onlyRole(PAUSER_ROLE)` | Emergency circuit breaker |
+| `emergencyUnpause()` | `onlyRole(ADMIN_ROLE)` | Resume operations |
+| `setFirewall(firewall)` | `onlyRole(ADMIN_ROLE)` | Update firewall reference |
 | `emergencyWithdraw(token, to, amount)` | `onlyRole(ADMIN_ROLE)`, `whenPaused` | Rescue stuck tokens (only when paused) |
+
+> **Note:** `requestTransfer` has no role check by design — anyone can request a transfer, but the policy pipeline validates it. The policies themselves (spending limits, whitelist, multi-sig, etc.) are the access control for transfers.
 
 #### Token Flow
 
@@ -401,15 +422,23 @@ Depositor ──ERC20.transfer──▶ Treasury (holds tokens)
 ### BasePolicy (Abstract)
 
 **File:** `contracts/policies/BasePolicy.sol`
-**Role:** Abstract base for all policy modules. Provides engine authorization guard.
+**Role:** Abstract base for all policy modules. Provides engine authorization guard and owner access control.
 
 ```solidity
 abstract contract BasePolicy is IPolicy {
     address public policyEngineAddress;
     address public owner;
 
+    error OnlyPolicyEngine();
+    error OnlyOwner();
+
     modifier onlyPolicyEngine() {
         if (msg.sender != policyEngineAddress) revert OnlyPolicyEngine();
+        _;
+    }
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert OnlyOwner();
         _;
     }
 
@@ -418,13 +447,14 @@ abstract contract BasePolicy is IPolicy {
 }
 ```
 
-All 6 policy modules extend `BasePolicy`.
+All 6 policy modules extend `BasePolicy`. The `onlyOwner` modifier enforces that only the deployer/owner can change policy configuration (limits, whitelist entries, risk scores, etc.).
 
 ---
 
 ### SpendingLimitPolicy
 
-**File:** `contracts/policies/SpendingLimitPolicy.sol`
+**File:** `contracts/policies/SpendingLimitPolicy.sol` (Solidity, standby)
+**Active Version:** `stylus-policies/src/lib.rs` (Rust/WASM, in vault pipeline)
 **Type:** Stateful (records cumulative daily spending)
 
 #### Logic
@@ -462,6 +492,10 @@ struct DailySpending {
 
 The day boundary is computed as `block.timestamp / 1 days`. When the day number changes, `spent` resets to 0 automatically in `recordTransaction()`. No external cron or keeper needed.
 
+#### Active Deployment
+
+The **Stylus (Rust/WASM) version** is the active SpendingLimitPolicy in the vault pipeline. The Solidity version has been removed from the vault via `policyEngine.removePolicy()` and remains deployed as a verified reference on Arbiscan.
+
 ---
 
 ### WhitelistPolicy
@@ -473,7 +507,7 @@ validate():
   └── Check: isWhitelisted[vault][to] == true
 ```
 
-Per-vault recipient allowlists. Batch add/remove supported. Zero-trust default — no address is allowed until explicitly whitelisted.
+Per-vault recipient allowlists. Batch add/remove supported. Zero-trust default — no address is allowed until explicitly whitelisted. Configuration functions gated by `onlyOwner`.
 
 ---
 
@@ -489,7 +523,7 @@ recordTransaction():
   └── lastTransferTime[vault] = block.timestamp
 ```
 
-Prevents rapid-fire extraction. Configurable cooldown per vault.
+Prevents rapid-fire extraction. Configurable cooldown per vault. Configuration functions gated by `onlyOwner`.
 
 ---
 
@@ -500,7 +534,7 @@ Prevents rapid-fire extraction. Configurable cooldown per vault.
 ```
 validate():
   ├── Compute txHash = keccak256(vault, token, to, amount)
-  └── Check: approvalCount[txHash] >= threshold[vault]
+  └── Check: approvalCount[txHash] >= requiredApprovals (currently 2)
 
 recordTransaction():
   └── Clear all approvals for txHash (reset after execution)
@@ -514,9 +548,24 @@ bytes32 txHash = keccak256(abi.encodePacked(vault, token, to, amount));
 
 Signers approve a specific `(vault, token, to, amount)` tuple. Once threshold is met and the tx executes, all approvals for that hash are cleared.
 
-#### Auto-Register
+#### Signer Management
 
-Signers are automatically registered on first approval. No separate registration step.
+Signers must be **pre-registered** by the contract owner via `addSigner()`. Only registered signers can call `approveTransaction()` or `revokeApproval()`. There is no auto-registration — attempting to approve as a non-signer reverts with `NotASigner`.
+
+#### Access Control
+
+| Function | Guard | Description |
+|---|---|---|
+| `addSigner(signer)` | `onlyOwner` | Register a new signer |
+| `removeSigner(signer)` | `onlyOwner` | Remove a signer |
+| `setRequiredApprovals(count)` | `onlyOwner` | Change M-of-N threshold |
+| `approveTransaction(...)` | `isSigner` | Approve a pending tx |
+| `revokeApproval(...)` | `isSigner` | Revoke own approval |
+
+#### Current On-Chain Configuration
+
+- **Required approvals:** 2
+- **Registered signers:** 4
 
 ---
 
@@ -530,7 +579,7 @@ validate():
       └── If no custom score → use defaultScore
 ```
 
-Addresses scored 0–100. Batch scoring supported. Blocks transfers to addresses below the vault's risk threshold.
+Addresses scored 0–100. Batch scoring supported. Blocks transfers to addresses below the vault's risk threshold. Score management gated by `onlyOwner`.
 
 ---
 
@@ -608,8 +657,9 @@ _policies.pop();
 **File:** `stylus-policies/src/lib.rs`
 **Runtime:** Arbitrum Stylus (compiled to WASM)
 **SDK:** `stylus-sdk v0.10.0`, `alloy-primitives v1.3`
+**Status:** ⚡ **Active in vault pipeline** — Solidity version removed from vault
 
-The Stylus version is a **1:1 mirror** of the Solidity SpendingLimitPolicy, deployed as a WASM contract on Arbitrum for ~8–9x gas savings.
+The Stylus version is a **1:1 mirror** of the Solidity SpendingLimitPolicy, deployed as a WASM contract on Arbitrum. It was **swapped in to replace the Solidity version** on-chain via `removePolicy()` + `addPolicy()`.
 
 #### Why Stylus for This Policy
 
@@ -651,6 +701,7 @@ impl SpendingLimitPolicy {
     fn record_transaction(&mut self, vault: Address, _token: Address, _to: Address, amount: U256);
     fn set_vault_daily_limit(&mut self, vault: Address, limit: U256);
     fn set_vault_max_tx_amount(&mut self, vault: Address, max_amount: U256);
+    fn initialize(&mut self, engine: Address, daily_limit: U256, max_tx: U256);
     // ... view functions
 }
 ```
@@ -666,9 +717,66 @@ fn only_policy_engine(&self) -> Result<(), Vec<u8>> {
 }
 ```
 
+#### Initialization
+
+The Stylus contract uses an `initialize()` pattern instead of a constructor. After deployment, `initialize(policyEngineAddress, defaultDailyLimit, defaultMaxTxAmount)` must be called once to set the engine reference and default limits.
+
 #### ABI Compatibility
 
-The Rust contract emits Solidity ABI-compatible events and errors, making it a **drop-in replacement** for the Solidity version. The PolicyEngine doesn't need to know whether it's calling a Solidity or Stylus policy.
+The Rust contract implements the same `IPolicy` interface (`validate`, `recordTransaction`, `policyName`), making it a **drop-in replacement** for the Solidity version. The PolicyEngine doesn't need to know whether it's calling a Solidity or Stylus policy.
+
+---
+
+## Access Control Model
+
+FortiLayer enforces access control across all contracts. Every administrative function is gated.
+
+### Per-Contract Access Control
+
+```
+┌─ Treasury ──────────────────────────────────┐
+│ ADMIN_ROLE    → setFirewall, emergencyUnpause│
+│                  emergencyWithdraw           │
+│ PAUSER_ROLE   → emergencyPause               │
+│ (no role)     → requestTransfer, deposit     │
+│                 (policies validate transfers)│
+└──────────────────────────────────────────────┘
+
+┌─ PolicyEngine ──────────────────────────────┐
+│ onlyOwner      → pause, unpause             │
+│ onlyVaultOwner → addPolicy, removePolicy    │
+│                   (per-vault ownership)      │
+│ (public)       → registerVault              │
+└──────────────────────────────────────────────┘
+
+┌─ TreasuryFirewall ──────────────────────────┐
+│ onlyOwner      → authorizeVault, revokeVault│
+│                  setPolicyEngine             │
+│                  pause, unpause              │
+└──────────────────────────────────────────────┘
+
+┌─ BasePolicy (all 6 policies) ───────────────┐
+│ onlyOwner         → configuration functions │
+│ onlyPolicyEngine  → recordTransaction       │
+└──────────────────────────────────────────────┘
+
+┌─ MultiSigPolicy (additional) ───────────────┐
+│ onlyOwner  → addSigner, removeSigner,       │
+│               setRequiredApprovals           │
+│ isSigner   → approveTransaction,            │
+│               revokeApproval                 │
+└──────────────────────────────────────────────┘
+```
+
+### Transfer Authorization Model
+
+Transfers are authorized by the **policy pipeline**, not by RBAC roles. Anyone can call `requestTransfer()`, but the transfer only executes if:
+1. All 5 active policies pass validation (AND logic)
+2. MultiSig has ≥ 2 approvals from registered signers
+3. Recipient is whitelisted
+4. Spending limits not exceeded
+5. Cooldown period elapsed
+6. Risk score above threshold
 
 ---
 
@@ -678,10 +786,11 @@ The Rust contract emits Solidity ABI-compatible events and errors, making it a *
 
 ```
 Layer 1: ACCESS CONTROL
-  ├── Treasury: ADMIN_ROLE, EXECUTOR_ROLE, PAUSER_ROLE
-  ├── PolicyEngine: onlyOwner, onlyVaultOwner
-  ├── Firewall: onlyOwner, onlyAuthorizedVault
-  └── Policies: onlyPolicyEngine, onlyOwner
+  ├── Treasury: ADMIN_ROLE, PAUSER_ROLE (OpenZeppelin AccessControl)
+  ├── PolicyEngine: onlyOwner, onlyVaultOwner (enforced)
+  ├── Firewall: onlyOwner, onlyAuthorizedVault (enforced)
+  ├── Policies: onlyPolicyEngine, onlyOwner (enforced)
+  └── MultiSig: onlyOwner for admin, isSigner for approvals
 
 Layer 2: EXECUTION FIREWALL
   ├── Tokens held by Treasury — not directly accessible
@@ -689,10 +798,10 @@ Layer 2: EXECUTION FIREWALL
   └── Firewall only acts after PolicyEngine approval
 
 Layer 3: POLICY PIPELINE (AND Logic)
-  ├── SpendingLimitPolicy — cumulative + per-tx caps
+  ├── SpendingLimitPolicy 🦀 — cumulative + per-tx caps (Stylus WASM)
   ├── WhitelistPolicy — recipient allowlist
   ├── TimelockPolicy — cooldown enforcement
-  ├── MultiSigPolicy — M-of-N approval
+  ├── MultiSigPolicy — 2-of-N approval (4 registered signers)
   ├── RiskScorePolicy — address scoring
   └── OracleRiskScorePolicy — market-adaptive risk
 
@@ -710,7 +819,7 @@ Layer 4: CIRCUIT BREAKERS (3 Independent)
 | **ReentrancyGuard** | PolicyEngine, TreasuryFirewall, Treasury, TransactionExecutor | Prevent reentrancy attacks |
 | **Pausable** | PolicyEngine, TreasuryFirewall, Treasury | Emergency freeze |
 | **SafeERC20** | TreasuryFirewall, Treasury, TransactionExecutor | Safe token operations |
-| **Custom Errors** | All 17 contracts | Gas-efficient, parseable error reporting |
+| **Custom Errors** | All contracts | Gas-efficient, parseable error reporting |
 | **No string reverts** | All contracts | Frontend-parseable errors only |
 
 ### Circuit Breaker Behavior
@@ -751,6 +860,7 @@ Layer 4: CIRCUIT BREAKERS (3 Independent)
 | **WASM native execution** | ~8–9x cheaper than EVM for compute-heavy paths |
 | **Rust zero-cost abstractions** | No runtime overhead |
 | **Targeted deployment** | Only the hottest path (SpendingLimit) moved to Stylus |
+| **Active in vault** | Real gas savings on every transfer, not theoretical |
 
 ### Pre-Flight Simulation
 
@@ -824,7 +934,7 @@ interface IChainlinkFeed {
 ┌─ Core ──────────────────────────────────────────────────┐
 │ PolicyEngine         0x245118Fba999F1ed338174933f83bdD6  │
 │ TreasuryFirewall     0xE3Be337BdC98Af11D3C8bcaB9149356A  │
-│ TransactionExecutor  (embedded)                          │
+│ TransactionExecutor  (deployed, not in primary flow)     │
 └──────────────────────────────────────────────────────────┘
 
 ┌─ Vault ─────────────────────────────────────────────────┐
@@ -832,18 +942,22 @@ interface IChainlinkFeed {
 │ PolicyRegistry       0x5f36947d6d829616bAd785Be7eCb13cf  │
 └──────────────────────────────────────────────────────────┘
 
-┌─ Policies (Solidity) ───────────────────────────────────┐
-│ SpendingLimitPolicy  0x17580a550087C55CF68AD9Cc19F56862  │
+┌─ Policies (Active in Vault Pipeline) ───────────────────┐
+│ MultiSigPolicy       0x88010789fF9109A00912F9a9a62414D8  │ 2-of-N
 │ WhitelistPolicy      0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D  │
-│ TimelockPolicy       0xa9BB981a309DEf9b74A390f2170fE56C  │
-│ MultiSigPolicy       0x88010789fF9109A00912F9a9a62414D8  │
 │ RiskScorePolicy      0x54305829743e301ebF8D868037B4081c  │
-│ OracleRiskScorePolicy 0x52d4E065453d0E3aabE727A38A33bFb │
+│ TimelockPolicy       0xa9BB981a309DEf9b74A390f2170fE56C  │
+│ SpendingLimit 🦀     0xb92da51e406b72fddd4cdc03b32ddd2b  │ Stylus WASM
+└──────────────────────────────────────────────────────────┘
+
+┌─ Policies (Deployed, Not in Vault) ─────────────────────┐
+│ SpendingLimitPolicy  0x17580a550087C55CF68AD9Cc19F56862  │ Solidity (standby)
+│ OracleRiskScorePolicy 0x52d4E065453d0E3aabE727A38A33bFb │ (not in vault pipeline)
 └──────────────────────────────────────────────────────────┘
 
 ┌─ Stylus (WASM) ─────────────────────────────────────────┐
 │ SpendingLimitPolicy  0xb92da51e406b72fddd4cdc03b32ddd2b  │
-│ (11.5 KB · Rust · cached)                                │
+│ (11.5 KB · Rust · cached · ACTIVE IN VAULT)              │
 └──────────────────────────────────────────────────────────┘
 
 ┌─ External ──────────────────────────────────────────────┐
@@ -860,9 +974,12 @@ Treasury ──approves──▶ TreasuryFirewall ──validates──▶ Polic
     │                        │                       iterates over
     │                        │                              │
     │                   executes                    ┌───────┴───────┐
-    │               safeTransferFrom                │  Policy[0..5] │
+    │               safeTransferFrom                │  Policy[0..4] │
     │                                               │  .validate()  │
     │                                               │  .record()    │
+    │                                               │               │
+    │                                               │  [4] = Stylus │
+    │                                               │  🦀 WASM      │
     │                                               └───────────────┘
     │
     └── holds all ERC-20 tokens
@@ -908,7 +1025,7 @@ MyCustomPolicy policy = new MyCustomPolicy(policyEngineAddress);
 // 3. Register with registry (optional, for discoverability)
 policyRegistry.registerPolicy(address(policy));
 
-// 4. Attach to vault — live immediately
+// 4. Attach to vault — live immediately (only vault owner can do this)
 policyEngine.addPolicy(vaultAddress, address(policy));
 ```
 

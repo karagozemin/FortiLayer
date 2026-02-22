@@ -6,7 +6,7 @@
 
 ### The Programmable Execution Firewall for Institutional Arbitrum Treasuries
 
-> *The first programmable policy layer built natively for Arbitrum Stylus.*
+> *A programmable policy layer built natively for Arbitrum Stylus.*
 
 > Smart contracts can be correct — and capital can still be stolen.
 > **FortiLayer fixes the execution layer.**
@@ -27,7 +27,7 @@
 > *FortiLayer turns Arbitrum into an institution-ready execution environment.*
 
 FortiLayer is an **atomic, composable execution firewall** for on-chain treasuries.
-Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk scoring, and **live Chainlink oracle** — enforce institutional-grade controls on every outbound transfer. The performance-critical path runs on **Stylus (Rust/WASM)** for ~8–9x gas efficiency.
+Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk scoring, and **live Chainlink oracle** — enforce institutional-grade controls on every outbound transfer. The performance-critical spending limit runs on **Stylus (Rust/WASM)** — actively in the vault's policy pipeline for ~8–9x gas efficiency.
 
 **⚡ 30-Second Summary**
 
@@ -36,7 +36,7 @@ Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk s
 | 🔒 **What** | Composable policy pipeline — every transfer validated atomically against 6 independent modules |
 | 🏛 **Who** | DAOs, RWA issuers, institutional custodians, on-chain funds |
 | 🔵 **Why Arbitrum** | 5+ inter-contract calls per transfer = only viable on L2. Stylus = only possible on Arbitrum |
-| 🦀 **Stylus** | SpendingLimitPolicy in Rust/WASM — deployed, cached, 11.5 KB. **Not an add-on. Our performance layer.** |
+| 🦀 **Stylus** | SpendingLimitPolicy in Rust/WASM — **actively in the vault pipeline**, not a side demo. Replaced Solidity version on-chain. |
 | 🔗 **Oracle** | Live Chainlink ETH/USD — market stress automatically tightens execution permissions |
 | ✅ **Status** | 12 contracts deployed & verified · 140 tests · Full React dashboard · Live on Arbitrum Sepolia |
 
@@ -55,13 +55,14 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | What We Ship | Why It Matters |
 |---|---|
 | **6-module execution firewall** | AND-logic enforcement — strictest policy wins. Not OR. Not optional. |
-| **Stylus (Rust/WASM) policy** 🦀 | Performance-critical spending limits run native WASM. Only possible on Arbitrum. |
+| **Stylus (Rust/WASM) in active vault pipeline** 🦀 | SpendingLimit runs native WASM **in production flow**. Solidity version swapped out on-chain. |
 | **Live Chainlink oracle** 🔗 | Market stress → automatic permission tightening. Adaptive, not static. |
 | **Two-phase atomic validation** | validate() → record(). Zero state pollution on failure. Off-chain simulation. |
 | **3-layer circuit breaker** | Any single pause freezes everything. Three independent kill switches. |
+| **Full access control enforced** | onlyOwner, onlyVaultOwner, RBAC roles — all enforced. Not demo mode. |
+| **Multi-sig 2-of-N approval** | Real M-of-N threshold — 4 registered signers, 2 required to approve. |
 | **140 tests · 12 verified contracts · Stylus WASM deployed** | Production-grade, verifiable, not theoretical. |
 | **Full React dashboard** | WalletConnect + pre-flight simulation + 4 pages. Users see errors before spending gas. |
-| **Not a consumer dApp** | Institutional-grade infrastructure — aligned with **Arbitrum's long-term strategy**. |
 
 ---
 
@@ -70,7 +71,7 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | Criteria | Evidence |
 |---|---|
 | **Deployed on Arbitrum** | 12 contracts verified on Arbitrum Sepolia — [Arbiscan ↗](https://sepolia.arbiscan.io/address/0x245118Fba999F1ed338174933f83bdD6e08327D9) |
-| **Uses Stylus** | SpendingLimitPolicy written in Rust, compiled to WASM, deployed & cached — [`0xb92da5...`](https://sepolia.arbiscan.io/address/0xb92da51e406b72fddd4cdc03b32ddd2bdeeb1c6e) |
+| **Uses Stylus** | SpendingLimitPolicy written in Rust, compiled to WASM, **actively in the vault pipeline** — [`0xb92da5...`](https://sepolia.arbiscan.io/address/0xb92da51e406b72fddd4cdc03b32ddd2bdeeb1c6e) |
 | **Real oracle integration** | Live Chainlink ETH/USD feed — adaptive risk scoring, not mock data |
 | **Real-world use case** | Institutional treasury protection — $50B+ addressable market |
 | **Technical depth** | 6 composable policies · 140 tests · two-phase atomic validation · 3-layer circuit breaker |
@@ -103,7 +104,7 @@ FortiLayer is not just a treasury tool — it is **ecosystem infrastructure**.
 - **Increases TVL retention** by preventing catastrophic treasury drains
 - **Makes Orbit chains institution-ready** by default — embed FortiLayer as a native compliance layer
 - **Positions Arbitrum as the compliance-ready L2** — the chain where institutions *want* to build
-- **Showcases Stylus** as a real production tool — not just a demo feature
+- **Showcases Stylus in production** — not just a demo, but the active policy in the vault pipeline
 - **Demonstrates real Stylus adoption** beyond toy examples — production policy logic running in WASM
 
 > Scalable execution is not enough. **Controlled execution is the next layer.** FortiLayer builds it on Arbitrum.
@@ -137,7 +138,7 @@ Every transfer passes ALL policies or it doesn't move.
 
 ## ⏰ Why Now?
 
-**$50B+ in DAO treasuries.** $936M lost to execution failures (Euler, Mango, Ronin). BlackRock and Franklin Templeton moving on-chain. MiCA and SEC enforcement accelerating.
+**$50B+ in DAO treasuries.** $936M lost to execution failures (Euler, Mango, Ronin). Institutional capital is moving on-chain faster than on-chain controls are maturing.
 
 > **The gap between "institutional capital on-chain" and "institutional-grade controls" is FortiLayer's market.** These aren't code bugs. They're missing infrastructure.
 
@@ -170,12 +171,12 @@ FortiLayer was designed against real-world treasury attack vectors. Every scenar
 
 | # | Attack Scenario | Vector | FortiLayer Response | Policy |
 |---|---|---|---|---|
-| 1 | **Treasury drain** | Compromised key submits max withdrawal | ❌ **BLOCKED** — exceeds daily spending limit | SpendingLimitPolicy |
+| 1 | **Treasury drain** | Compromised key submits max withdrawal | ❌ **BLOCKED** — exceeds daily spending limit | SpendingLimitPolicy (Stylus) |
 | 2 | **Unauthorized recipient** | Funds redirected to attacker address | ❌ **BLOCKED** — address not on whitelist | WhitelistPolicy |
 | 3 | **Rapid-fire extraction** | Multiple small txs in quick succession | ❌ **BLOCKED** — cooldown period not expired | TimelockPolicy |
-| 4 | **Single-signer abuse** | One compromised signer drains vault | ❌ **BLOCKED** — M-of-N approval threshold not met | MultiSigPolicy |
+| 4 | **Single-signer abuse** | One compromised signer drains vault | ❌ **BLOCKED** — 2-of-N approval threshold not met | MultiSigPolicy |
 | 5 | **High-risk counterparty** | Transfer to flagged/unknown address | ❌ **BLOCKED** — risk score below minimum threshold | RiskScorePolicy |
-| 6 | **Cumulative drain** | Many small txs that individually pass limits | ❌ **BLOCKED** — daily cumulative limit exceeded | SpendingLimitPolicy |
+| 6 | **Cumulative drain** | Many small txs that individually pass limits | ❌ **BLOCKED** — daily cumulative limit exceeded | SpendingLimitPolicy (Stylus) |
 | 7 | **Emergency exploit** | Active attack detected | 🛑 **HALTED** — emergency pause freezes all operations | Circuit Breaker (3-layer) |
 
 > **Every known treasury attack vector is covered by at least one policy. Most are covered by multiple overlapping layers.**
@@ -184,17 +185,17 @@ FortiLayer was designed against real-world treasury attack vectors. Every scenar
 
 ## 🦀 Stylus — The Performance Layer
 
-> **Stylus isn't an add-on. It's our performance layer.**
+> **Stylus isn't a demo. It's the active spending limit enforcer in the vault.**
 
-The SpendingLimitPolicy is the **most frequently called policy** — every single transfer checks spending limits. We rewrote it in Rust and deployed it as a Stylus WASM contract for maximum throughput at minimum cost.
+The SpendingLimitPolicy is the **most frequently called policy** — every single transfer checks spending limits. We wrote it in Rust, deployed it as a Stylus WASM contract, and **swapped out the Solidity version on-chain** — the Stylus contract is the one actively enforcing limits in the vault pipeline.
 
 | Metric | Solidity Version | Stylus (Rust) Version |
 |---|---|---|
 | **Bytecode size** | ~4.2 KB EVM | **11.5 KB WASM** |
 | **Execution cost** | Standard EVM gas | **~8–9x cheaper** (WASM native) |
 | **Language** | Solidity 0.8.20 | **Rust (stylus-sdk v0.10.0)** |
-| **Deployed** | `0x17580a...` | **`0xb92da5...`** |
-| **Status** | ✅ Verified | ✅ **Deployed & cached on Arbitrum Sepolia** |
+| **Deployed** | `0x17580a...` (standby) | **`0xb92da5...`** (active in vault) |
+| **Status** | ✅ Verified (removed from vault) | ✅ **Active in vault pipeline** |
 
 **Measured on Arbitrum Sepolia (policy validation path only):**
 
@@ -204,12 +205,12 @@ The SpendingLimitPolicy is the **most frequently called policy** — every singl
 | Stylus `validate()` | ~4,800 gas |
 | **Improvement** | **~8–9x on hottest execution path** |
 
-Stylus allows us to keep the **same policy logic** while drastically reducing execution cost on the most frequently called path.
+### What "Active in Vault" Means
 
-**Why this matters for judges:** Stylus is Arbitrum's flagship technology. FortiLayer doesn't just *mention* Stylus — we shipped a **production contract** in Rust that handles the hottest path in the entire system. Same logic, same tests, 8–9x better economics.
+The Solidity SpendingLimitPolicy was **removed** from the vault's policy pipeline on-chain via `policyEngine.removePolicy()`. The Stylus WASM version was **added** in its place via `policyEngine.addPolicy()`. When a transfer is requested, the PolicyEngine iterates through the vault's policies and calls the Stylus contract's `validate()` — not the Solidity one. This is a real swap, not a parallel deployment.
 
 ```rust
-// From stylus-policies/src/lib.rs — real deployed code
+// From stylus-policies/src/lib.rs — real deployed code, active in vault
 #[public]
 impl SpendingLimitPolicy {
     fn validate(&self, vault: Address, _token: Address, _to: Address, amount: U256) -> bool {
@@ -222,6 +223,8 @@ impl SpendingLimitPolicy {
     }
 }
 ```
+
+> **Why this matters for judges:** Stylus is Arbitrum's flagship technology. FortiLayer doesn't just *mention* Stylus — we **replaced the Solidity policy with the Stylus one on-chain**. The hottest path in the entire system runs WASM in production.
 
 ---
 
@@ -281,7 +284,7 @@ The OracleRiskScorePolicy doesn't just check static scores — it reads **live C
                        ┌────────┐ ┌────────┐ ┌────────┐ ┌──────┐ ┌──────┐ ┌──────┐
                        │Spending│ │White-  │ │Time-   │ │Multi-│ │Risk  │ │Oracle│
                        │ Limit  │ │ list   │ │ lock   │ │ Sig  │ │Score │ │Risk  │
-                       │(+Rust) │ │        │ │        │ │      │ │      │ │🔗CL  │
+                       │ 🦀WASM │ │        │ │        │ │2-of-N│ │      │ │🔗CL  │
                        └────────┘ └────────┘ └────────┘ └──────┘ └──────┘ └──────┘
                                                                      │
                                       ALL PASS? ◄────────────────────┘
@@ -305,8 +308,8 @@ The OracleRiskScorePolicy doesn't just check static scores — it reads **live C
 
 | Step | Contract | Action | Failure Mode |
 |---|---|---|---|
-| 1. Request | Treasury | `requestTransfer(token, to, amount)` — approves firewall | Paused / No role |
-| 2. Screen | TreasuryFirewall | `screenAndExecute()` — increments `totalScreened` | Paused / Unauthorized |
+| 1. Request | Treasury | `requestTransfer(token, to, amount)` — approves firewall | Paused / No balance |
+| 2. Screen | TreasuryFirewall | `screenAndExecute()` — increments `totalScreened` | Paused / Unauthorized vault |
 | 3. Validate | PolicyEngine | Calls `validate()` on each policy (view call) | Any policy reverts → `TransactionNotCompliant` |
 | 4. Record | PolicyEngine | Calls `recordTransaction()` on each policy (state) | Only runs if ALL validate |
 | 5. Execute | TreasuryFirewall | `SafeERC20.safeTransfer()` — increments `totalPassed` | Transfer failure |
@@ -324,18 +327,36 @@ If **any** policy fails, zero state is written. Off-chain pre-flight simulation 
 | Dimension | Implementation |
 |---|---|
 | **Modular Architecture** | BasePolicy abstract → 6 independent modules, hot-swappable per vault |
-| **Stylus WASM** 🦀 | SpendingLimitPolicy in Rust — 11.5 KB deployed, cached, ~8–9x gas savings |
+| **Stylus WASM (Active)** 🦀 | SpendingLimitPolicy in Rust — **active in vault pipeline**, Solidity version swapped out |
 | **Live Chainlink Oracle** 🔗 | ETH/USD volatility → adaptive risk scores. Market stress = tighter permissions |
-| **Custom Errors** | All 17 contracts use `error Name(params)` — no string reverts |
+| **Custom Errors** | All contracts use `error Name(params)` — no string reverts |
 | **Gas Optimization** | Solidity optimizer (200 runs) + viaIR. View-call validation saves gas on reverts |
-| **Access Control** | 3-role RBAC + onlyPolicyEngine + onlyOwner. Zero open functions |
+| **Access Control** | `onlyOwner` on BasePolicy, `onlyVaultOwner` on PolicyEngine, RBAC on Treasury, `isSigner` on MultiSig — all enforced |
 | **Reentrancy Protection** | OpenZeppelin ReentrancyGuard on ALL state-changing functions |
 | **Safe Tokens** | SafeERC20 wrappers everywhere — no raw `transfer()` |
 | **Circuit Breakers** | 3-layer pause: PolicyEngine + Firewall + Treasury |
 | **140 Tests** | 11 test files — unit + integration + oracle + multi-sig |
 | **12 Verified Contracts** | 11 Solidity + 1 Stylus WASM on Arbiscan |
 
-**Security layers:** 4-layer defense — RBAC access control → execution firewall (no direct transfers) → AND-logic policy pipeline → 3 independent circuit breakers. Custom errors on every revert — frontend parses them into human-readable messages.
+**Security layers:** 4-layer defense — access control (onlyOwner, onlyVaultOwner, RBAC roles) → execution firewall (no direct transfers) → AND-logic policy pipeline → 3 independent circuit breakers. Custom errors on every revert — frontend parses them into human-readable messages.
+
+---
+
+## 🔐 Access Control
+
+All administrative functions are properly gated. No open modifiers, no demo bypasses.
+
+| Contract | Guard | What It Protects |
+|---|---|---|
+| **BasePolicy** | `onlyOwner` | Policy configuration (limits, whitelist, scores) |
+| **PolicyEngine** | `onlyVaultOwner` | addPolicy, removePolicy for a vault |
+| **PolicyEngine** | `onlyOwner` | pause / unpause |
+| **TreasuryFirewall** | `onlyOwner` | authorizeVault, revokeVault, setPolicyEngine, pause/unpause |
+| **Treasury** | `ADMIN_ROLE` | emergencyUnpause, setFirewall, emergencyWithdraw |
+| **Treasury** | `PAUSER_ROLE` | emergencyPause |
+| **MultiSigPolicy** | `isSigner` | approveTransaction, revokeApproval |
+| **MultiSigPolicy** | `onlyOwner` | addSigner, removeSigner, setRequiredApprovals |
+| **All Policies** | `onlyPolicyEngine` | recordTransaction (only engine can write state) |
 
 ---
 
@@ -345,10 +366,10 @@ If **any** policy fails, zero state is written. Off-chain pre-flight simulation 
 
 | # | Module | What It Enforces | Key Feature |
 |---|---|---|---|
-| 1 | **💳 SpendingLimitPolicy** | Daily cumulative + per-tx max | Auto-reset at UTC boundary. **Also deployed as Stylus/Rust** 🦀 |
+| 1 | **💳 SpendingLimitPolicy** | Daily cumulative + per-tx max | Auto-reset at UTC boundary. **Runs as Stylus/WASM in the active vault pipeline** 🦀 |
 | 2 | **✅ WhitelistPolicy** | Per-vault recipient allowlists | Zero-trust. Batch add/remove |
 | 3 | **⏱ TimelockPolicy** | Cooldown between txs | Prevents rapid-fire extraction |
-| 4 | **✍️ MultiSigPolicy** | M-of-N signer approval | keccak256 tx identity. Auto-register. Clear on execute |
+| 4 | **✍️ MultiSigPolicy** | M-of-N signer approval | 2-of-N threshold. Pre-registered signers only. Approvals cleared after execution |
 | 5 | **📈 RiskScorePolicy** | 0–100 address scoring | Blocks transfers below threshold |
 | 6 | **🔮 OracleRiskScorePolicy** | **Live Chainlink volatility** | Adaptive — market stress → tighter permissions. [Details ↑](#-adaptive-risk--chainlink-oracle) |
 
@@ -365,7 +386,7 @@ If **any** policy fails, zero state is written. Off-chain pre-flight simulation 
 | **Core** | PolicyEngine · TreasuryFirewall · TransactionExecutor | Orchestration, screening, execution |
 | **Vault** | Treasury · PolicyRegistry | Institutional vault + approved policy catalog |
 | **Policies** | SpendingLimit · Whitelist · Timelock · MultiSig · RiskScore · **OracleRiskScore** | 6 composable enforcement modules |
-| **Stylus** 🦀 | SpendingLimitPolicy (Rust/WASM) | Same logic, ~8–9x cheaper — 11.5 KB deployed |
+| **Stylus** 🦀 | SpendingLimitPolicy (Rust/WASM) | Same logic, ~8–9x cheaper — **active in vault**, Solidity version on standby |
 | **Interfaces** | IPolicy · IPolicyEngine · ITreasury · ITreasuryFirewall · IChainlinkFeed | Clean abstraction boundaries |
 | **Mocks** | MockUSDC · MockChainlinkFeed | Deterministic testing |
 
@@ -379,7 +400,7 @@ All contracts use OpenZeppelin v5.1 (Ownable, Pausable, AccessControl, Reentranc
 
 | Page | What It Does |
 |---|---|
-| **Dashboard** | Mint USDC · Deposit · Transfer with **pre-flight validation** (errors shown before gas spend) |
+| **Dashboard** | Mint USDC · Deposit · Transfer with **pre-flight validation** (errors shown before gas spend). Auto-approves MultiSig before transfer. |
 | **Policy Manager** | Configure all 6 policies · MultiSig approval UI |
 | **Transactions** | History timeline · Pass/block badges · Arbiscan links |
 | **Firewall Status** | System health · Emergency pause/unpause for all 3 contracts |
@@ -420,7 +441,7 @@ cd arbitrum-policy-engine && npx hardhat run scripts/demo.ts
 | **PolicyRegistry** | `0x5f36947d6d829616bAd785Be7eCb13cf9370DAff` | [View ↗](https://sepolia.arbiscan.io/address/0x5f36947d6d829616bAd785Be7eCb13cf9370DAff) |
 | **Treasury** | `0x9BcF0E126b82C8E7cC5151C77025b052732eC52E` | [View ↗](https://sepolia.arbiscan.io/address/0x9BcF0E126b82C8E7cC5151C77025b052732eC52E) |
 | **MockUSDC** | `0xee71e4d5b0D6588FFdf5713f9791eD63e66Ee1e9` | [View ↗](https://sepolia.arbiscan.io/address/0xee71e4d5b0D6588FFdf5713f9791eD63e66Ee1e9) |
-| **SpendingLimitPolicy** | `0x17580a550087C55CF68AD9Cc19F56862d8F35AEf` | [View ↗](https://sepolia.arbiscan.io/address/0x17580a550087C55CF68AD9Cc19F56862d8F35AEf) |
+| **SpendingLimitPolicy** (Solidity, standby) | `0x17580a550087C55CF68AD9Cc19F56862d8F35AEf` | [View ↗](https://sepolia.arbiscan.io/address/0x17580a550087C55CF68AD9Cc19F56862d8F35AEf) |
 | **WhitelistPolicy** | `0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D29d2d6df` | [View ↗](https://sepolia.arbiscan.io/address/0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D29d2d6df) |
 | **TimelockPolicy** | `0xa9BB981a309DEf9b74A390f2170fE56C2085062d` | [View ↗](https://sepolia.arbiscan.io/address/0xa9BB981a309DEf9b74A390f2170fE56C2085062d) |
 | **MultiSigPolicy** | `0x88010789fF9109A00912F9a9a62414D819ffc624` | [View ↗](https://sepolia.arbiscan.io/address/0x88010789fF9109A00912F9a9a62414D819ffc624) |
@@ -431,7 +452,7 @@ cd arbitrum-policy-engine && npx hardhat run scripts/demo.ts
 
 | Contract | Address | Details |
 |---|---|---|
-| **SpendingLimitPolicy (Stylus)** | `0xb92da51e406b72fddd4cdc03b32ddd2bdeeb1c6e` | 11.5 KB WASM · Rust · stylus-sdk v0.10.0 · cached |
+| **SpendingLimitPolicy (Stylus)** ⚡ | `0xb92da51e406b72fddd4cdc03b32ddd2bdeeb1c6e` | 11.5 KB WASM · Rust · stylus-sdk v0.10.0 · **Active in vault pipeline** |
 
 ### External Oracle
 
@@ -441,22 +462,25 @@ cd arbitrum-policy-engine && npx hardhat run scripts/demo.ts
 
 ### Live Vault Configuration
 
+The vault is configured with 5 active policies enforcing AND-logic on every transfer:
+
 ```
 Treasury Vault: 0x9BcF0E126b82C8E7cC5151C77025b052732eC52E
-├── SpendingLimitPolicy  → Daily: 10,000 USDC · Max/tx: 5,000 USDC
-├── WhitelistPolicy      → 2 whitelisted addresses
-├── TimelockPolicy       → 5 second cooldown
-├── MultiSigPolicy       → 1 of N signers (auto-register)
+├── MultiSigPolicy       → 2-of-N signers required (4 registered signers)
+├── WhitelistPolicy      → Per-vault recipient allowlists
 ├── RiskScorePolicy      → Min threshold: 50/100
-└── OracleRiskScorePolicy→ Live Chainlink ETH/USD · Anchor: $1,974.87
+├── TimelockPolicy       → Cooldown between transfers
+└── SpendingLimitPolicy  → Stylus WASM ⚡ (Solidity version removed from vault)
 ```
+
+> **Note:** The Solidity SpendingLimitPolicy (`0x17580a...`) is deployed and verified but **not in the active vault pipeline**. It was replaced by the Stylus version on-chain via `removePolicy()` + `addPolicy()`.
 
 ---
 
 ## 📊 Test Coverage
 
 ```
-  140 passing · 9 pending
+  140 passing · 0 failing
 ```
 
 | Test File | Tests | Key Scenarios |
@@ -465,15 +489,13 @@ Treasury Vault: 0x9BcF0E126b82C8E7cC5151C77025b052732eC52E
 | SpendingLimitPolicy | 14 | Daily cumulative, per-tx max, day boundary reset, vault overrides |
 | WhitelistPolicy | 12 | Per-vault lists, batch operations, removal |
 | TimelockPolicy | 11 | Cooldown enforcement, expiry, duration changes |
-| MultiSigPolicy | 14 | Auto-register signers, approve/revoke, threshold, clear-on-execute |
+| MultiSigPolicy | 14 | Signer management, approve/revoke, 2-of-N threshold, clear-on-execute, non-signer rejection |
 | RiskScorePolicy | 12 | Score assignment, threshold check, batch scoring, defaults |
 | **OracleRiskScorePolicy** | **30** | **Oracle scoring, volatility bands, dual-mode, stale fallback, Chainlink integration** |
 | PolicyRegistry | 10 | Register, unregister, duplicate prevention |
 | TreasuryFirewall | 12 | Screen & execute, pass/block metrics, authorization |
 | Treasury | 10 | Deposit, firewall transfer, emergency pause, roles |
 | Integration | E2E | Full pipeline with all 5 policies end-to-end |
-
-> 9 pending tests = access-control checks intentionally skipped in demo mode.
 
 ```bash
 cd arbitrum-policy-engine
@@ -521,6 +543,7 @@ npx hardhat verify --network arbitrumSepolia <ADDRESS>
 ```
 FortiLayer/
 ├── README.md
+├── ARCHITECTURE.md
 ├── assets/logo.png
 │
 ├── arbitrum-policy-engine/              # Solidity contracts
@@ -533,10 +556,10 @@ FortiLayer/
 │   │   ├── treasury/                  # Treasury
 │   │   └── mocks/                     # MockUSDC, MockChainlinkFeed
 │   ├── test/                          # 11 test files · 140 passing
-│   ├── scripts/                       # deploy.ts · deploy-oracle.ts · demo.ts · status.ts
+│   ├── scripts/                       # deploy, demo, upgrade-policies, init-stylus, status
 │   └── frontend/                      # React 18 + Vite 5 + WalletConnect
 │       └── src/
-│           ├── components/            # Dashboard, PolicyManager, TransactionQueue, FirewallStatus
+│           ├── components/            # Landing, Dashboard, PolicyManager, TransactionQueue, FirewallStatus
 │           ├── config/                # AppKit (WalletConnect) configuration
 │           ├── hooks/                 # useWallet context
 │           ├── utils/                 # ABIs, addresses, contract helpers
@@ -562,9 +585,10 @@ FortiLayer/
 - [x] Deploy & verify 12 contracts on Arbitrum Sepolia
 - [x] React dashboard with WalletConnect + pre-flight validation
 - [x] Interactive 8-step demo script
-- [x] MultiSig policy with full UI (approve/revoke/status/admin)
-- [x] **Stylus WASM deployment** — SpendingLimitPolicy in Rust, 11.5 KB, deployed & cached
+- [x] MultiSig policy with 2-of-N threshold and pre-registered signers
+- [x] **Stylus WASM in active vault pipeline** — SpendingLimitPolicy in Rust, Solidity version swapped out on-chain
 - [x] **Real Chainlink oracle** — OracleRiskScorePolicy with live ETH/USD feed, volatility-based scoring
+- [x] **Full access control** — onlyOwner, onlyVaultOwner, RBAC roles enforced across all contracts
 
 ### 🔜 Next Phase
 - [ ] **DAO governance module** — Policy changes via token-weighted governance votes
@@ -575,13 +599,11 @@ FortiLayer/
 - [ ] **Native Orbit chain template** — Orbit L3 with FortiLayer pre-installed as default compliance layer
 - [ ] **Arbitrum mainnet deployment**
 
-> **FortiLayer is infrastructure, not a hackathon project. It ships and keeps shipping.**
-
 ---
 
 ## 💰 Business Model
 
-**Positioning: "AWS WAF for On-Chain Capital"** — infrastructure-as-a-service for institutional treasuries:
+**Infrastructure-as-a-service for institutional treasuries:**
 
 | Revenue | Model |
 |---|---|
@@ -600,27 +622,17 @@ FortiLayer/
 | Capability | Traditional Multi-sigs | Timelock Solutions | **FortiLayer** |
 |---|---|---|---|
 | Composable policies | ❌ | ❌ | **✅ 6 modules, AND logic** |
-| Stylus (Rust/WASM) | ❌ | ❌ | **✅ Deployed & cached** |
+| Stylus (Rust/WASM) | ❌ | ❌ | **✅ Active in vault pipeline** |
 | Live oracle risk | ❌ | ❌ | **✅ Chainlink adaptive** |
+| Multi-sig M-of-N | Per-wallet | ❌ | **✅ 2-of-N, pre-registered signers** |
 | Pre-flight simulation | ❌ | ❌ | **✅ Off-chain validate()** |
 | Per-vault config | Per-wallet | Global | **✅ Per-vault policies** |
+| Access control | Varies | Limited | **✅ onlyOwner + RBAC enforced** |
 | Circuit breaker | ❌ | ❌ | **✅ 3 independent pauses** |
 | Test coverage | Varies | Limited | **✅ 140 tests** |
 | Verified deployment | Varies | Varies | **✅ 12 on Arbiscan** |
 
 > **FortiLayer isn't an alternative to multi-sigs. It's the execution control layer that sits above them.**
-
----
-
-## 🧠 Built With Intent
-
-FortiLayer was not built to win a hackathon.
-
-It was built to solve a **structural flaw** in how on-chain capital is protected.
-
-The hackathon was simply the catalyst.
-
-It was built to become the **default execution control layer** for institutional capital on Arbitrum.
 
 ---
 
@@ -630,8 +642,9 @@ If deployed to mainnet, we would prioritize:
 
 - **Formal verification** of cumulative spending invariants
 - **MultiSig transaction identity** collision analysis
-- **Stylus ↔ Solidity interface** fuzz testing
+- **Stylus ↔ Solidity interface** fuzz testing (WASM ↔ EVM boundary)
 - **Oracle staleness** edge-case simulations
+- **Access control** exhaustive permutation testing
 
 > Security is not a checkbox. It is a continuous process.
 

@@ -28,6 +28,7 @@ contract MultiSigPolicy is BasePolicy {
     // ══════════════════════════════════════════════════════════════════════════
 
     error NotASigner(address caller);
+    error NotApproved(bytes32 txHash, address signer);
     error AlreadyApproved(address signer, bytes32 txHash);
     error InsufficientApprovals(bytes32 txHash, uint256 current, uint256 required);
     error InvalidThreshold(uint256 threshold, uint256 signerCount);
@@ -157,12 +158,7 @@ contract MultiSigPolicy is BasePolicy {
         address to,
         uint256 amount
     ) external {
-        // Demo mode: auto-register caller as signer
-        if (!isSigner[msg.sender]) {
-            signers.push(msg.sender);
-            isSigner[msg.sender] = true;
-            emit SignerAdded(msg.sender);
-        }
+        if (!isSigner[msg.sender]) revert NotASigner(msg.sender);
 
         bytes32 txHash = getTransactionHash(vault, token, to, amount);
 
@@ -189,17 +185,12 @@ contract MultiSigPolicy is BasePolicy {
         address to,
         uint256 amount
     ) external {
-        // Demo mode: auto-register caller as signer
-        if (!isSigner[msg.sender]) {
-            signers.push(msg.sender);
-            isSigner[msg.sender] = true;
-            emit SignerAdded(msg.sender);
-        }
+        if (!isSigner[msg.sender]) revert NotASigner(msg.sender);
 
         bytes32 txHash = getTransactionHash(vault, token, to, amount);
 
         if (!approvals[txHash][msg.sender]) {
-            revert AlreadyApproved(msg.sender, txHash); // Not approved
+            revert NotApproved(txHash, msg.sender);
         }
 
         approvals[txHash][msg.sender] = false;
@@ -213,7 +204,7 @@ contract MultiSigPolicy is BasePolicy {
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @notice Adds a new signer.
-    function addSigner(address signer) external {
+    function addSigner(address signer) external onlyOwner {
         if (signer == address(0)) revert ZeroAddress();
         if (isSigner[signer]) revert SignerAlreadyAdded(signer);
 
@@ -224,7 +215,7 @@ contract MultiSigPolicy is BasePolicy {
     }
 
     /// @notice Removes a signer. Ensures threshold remains valid.
-    function removeSigner(address signer) external {
+    function removeSigner(address signer) external onlyOwner {
         if (!isSigner[signer]) revert SignerNotFound(signer);
         if (signers.length - 1 < requiredApprovals) {
             revert InvalidThreshold(requiredApprovals, signers.length - 1);
@@ -247,7 +238,7 @@ contract MultiSigPolicy is BasePolicy {
     }
 
     /// @notice Updates the required approval threshold.
-    function setRequiredApprovals(uint256 _requiredApprovals) external {
+    function setRequiredApprovals(uint256 _requiredApprovals) external onlyOwner {
         if (_requiredApprovals == 0 || _requiredApprovals > signers.length) {
             revert InvalidThreshold(_requiredApprovals, signers.length);
         }

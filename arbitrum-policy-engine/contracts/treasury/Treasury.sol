@@ -157,13 +157,13 @@ contract Treasury is ITreasury, AccessControl, Pausable, ReentrancyGuard {
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @inheritdoc ITreasury
-    function emergencyPause() external override {
+    function emergencyPause() external override onlyRole(PAUSER_ROLE) {
         _pause();
         emit EmergencyPaused(msg.sender);
     }
 
     /// @inheritdoc ITreasury
-    function emergencyUnpause() external override {
+    function emergencyUnpause() external override onlyRole(ADMIN_ROLE) {
         _unpause();
         emit EmergencyUnpaused(msg.sender);
     }
@@ -173,7 +173,7 @@ contract Treasury is ITreasury, AccessControl, Pausable, ReentrancyGuard {
     // ══════════════════════════════════════════════════════════════════════════
 
     /// @notice Updates the TreasuryFirewall address. Use with extreme caution.
-    function setFirewall(address _firewall) external {
+    function setFirewall(address _firewall) external onlyRole(ADMIN_ROLE) {
         if (_firewall == address(0)) revert ZeroAddress();
         firewall = ITreasuryFirewall(_firewall);
     }
@@ -186,7 +186,7 @@ contract Treasury is ITreasury, AccessControl, Pausable, ReentrancyGuard {
         address token,
         address to,
         uint256 amount
-    ) external whenPaused {
+    ) external onlyRole(ADMIN_ROLE) whenPaused {
         if (token == address(0) || to == address(0)) revert ZeroAddress();
         if (amount == 0) revert ZeroAmount();
         IERC20(token).safeTransfer(to, amount);

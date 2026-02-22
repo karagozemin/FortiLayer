@@ -11,7 +11,7 @@ export const DEPLOYED_ADDRESSES: DeployedAddresses = {
   policyRegistry: '0x5f36947d6d829616bAd785Be7eCb13cf9370DAff',
   treasury: '0x9BcF0E126b82C8E7cC5151C77025b052732eC52E',
   mockUSDC: '0xee71e4d5b0D6588FFdf5713f9791eD63e66Ee1e9',
-  spendingLimitPolicy: '0x17580a550087C55CF68AD9Cc19F56862d8F35AEf',
+  spendingLimitPolicy: '0xb92da51e406b72fddd4cdc03b32ddd2bdeeb1c6e', // Stylus (Rust/WASM)
   whitelistPolicy: '0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D29d2d6df',
   timelockPolicy: '0xa9BB981a309DEf9b74A390f2170fE56C2085062d',
   multiSigPolicy: '0x88010789fF9109A00912F9a9a62414D819ffc624',

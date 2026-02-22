@@ -55,7 +55,7 @@ contract PolicyEngine is IPolicyEngine, Ownable, Pausable, ReentrancyGuard {
 
     /// @dev Ensures only the vault's registered owner can call
     modifier onlyVaultOwner(address vault) {
-        // Hackathon demo: anyone can manage vault policies
+        if (msg.sender != _vaults[vault].owner) revert NotVaultOwner(msg.sender, vault);
         _;
     }
 
@@ -215,12 +215,12 @@ contract PolicyEngine is IPolicyEngine, Ownable, Pausable, ReentrancyGuard {
 
     /// @notice Emergency pause — freezes all engine operations.
     /// @dev Only callable by the contract owner. Use in case of detected exploit.
-    function pause() external {
+    function pause() external onlyOwner {
         _pause();
     }
 
     /// @notice Resumes engine operations after emergency pause.
-    function unpause() external {
+    function unpause() external onlyOwner {
         _unpause();
     }
 }

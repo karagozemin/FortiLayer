@@ -72,13 +72,13 @@ describe("MultiSigPolicy", function () {
       expect(await policy.approvalCount(txHash)).to.equal(1);
     });
 
-    it("should auto-register non-signer on approval (demo mode)", async function () {
+    it("should revert when non-signer tries to approve", async function () {
       const { policy, nonSigner, vault, token, recipient, amount } = await loadFixture(deployFixture);
 
-      // Non-signer should be auto-added
       expect(await policy.isSigner(nonSigner.address)).to.be.false;
-      await policy.connect(nonSigner).approveTransaction(vault, token, recipient, amount);
-      expect(await policy.isSigner(nonSigner.address)).to.be.true;
+      await expect(
+        policy.connect(nonSigner).approveTransaction(vault, token, recipient, amount)
+      ).to.be.revertedWithCustomError(policy, "NotASigner");
     });
 
     it("should reject duplicate approval", async function () {
