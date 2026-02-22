@@ -5,17 +5,17 @@ import { DeployedAddresses } from '../types';
 // Run: npx hardhat run scripts/deploy.ts --network arbitrumSepolia
 
 export const DEPLOYED_ADDRESSES: DeployedAddresses = {
-  policyEngine: import.meta.env.VITE_POLICY_ENGINE || '',
-  treasuryFirewall: import.meta.env.VITE_TREASURY_FIREWALL || '',
-  transactionExecutor: import.meta.env.VITE_TRANSACTION_EXECUTOR || '',
-  policyRegistry: import.meta.env.VITE_POLICY_REGISTRY || '',
-  treasury: import.meta.env.VITE_TREASURY || '',
-  mockUSDC: import.meta.env.VITE_MOCK_USDC || '',
-  spendingLimitPolicy: import.meta.env.VITE_SPENDING_LIMIT_POLICY || '',
-  whitelistPolicy: import.meta.env.VITE_WHITELIST_POLICY || '',
-  timelockPolicy: import.meta.env.VITE_TIMELOCK_POLICY || '',
-  multiSigPolicy: import.meta.env.VITE_MULTISIG_POLICY || '',
-  riskScorePolicy: import.meta.env.VITE_RISK_SCORE_POLICY || '',
+  policyEngine: '0x245118Fba999F1ed338174933f83bdD6e08327D9',
+  treasuryFirewall: '0xE3Be337BdC98Af11D3C8bcaB9149356Ac013EE98',
+  transactionExecutor: '',
+  policyRegistry: '0x5f36947d6d829616bAd785Be7eCb13cf9370DAff',
+  treasury: '0x9BcF0E126b82C8E7cC5151C77025b052732eC52E',
+  mockUSDC: '0xee71e4d5b0D6588FFdf5713f9791eD63e66Ee1e9',
+  spendingLimitPolicy: '0x17580a550087C55CF68AD9Cc19F56862d8F35AEf',
+  whitelistPolicy: '0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D29d2d6df',
+  timelockPolicy: '0xa9BB981a309DEf9b74A390f2170fE56C2085062d',
+  multiSigPolicy: '0x88010789fF9109A00912F9a9a62414D819ffc624',
+  riskScorePolicy: '0x54305829743e301ebF8D868037B4081c90848924',
 };
 
 // ── Minimal ABIs (human-readable for ethers v6) ────────────────
