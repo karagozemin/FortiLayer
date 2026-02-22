@@ -27,7 +27,7 @@
 > *FortiLayer turns Arbitrum into an institution-ready execution environment.*
 
 FortiLayer is an **atomic, composable execution firewall** for on-chain treasuries.
-Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk scoring, and **live Chainlink oracle** — enforce institutional-grade controls on every outbound transfer. The performance-critical spending limit runs on **Stylus (Rust/WASM)** — actively in the vault's policy pipeline for ~8–9x gas efficiency.
+Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk scoring, and **live Chainlink oracle** — enforce institutional-grade controls on every outbound transfer. The performance-critical spending limit runs on **Stylus (Rust/WASM)** — actively in the vault's policy pipeline with significant gas savings.
 
 **⚡ 30-Second Summary**
 
@@ -154,7 +154,7 @@ FortiLayer's 6-policy pipeline makes **5+ inter-contract calls per transfer**. T
 | Requirement | Why Only Arbitrum | Impact |
 |---|---|---|
 | **$0.001/tx gas** | 5+ contract calls per transfer = $15-50 on mainnet, $0.01 on Arbitrum | Composable policies become economically viable |
-| **Stylus (Rust/WASM)** ⭐ | **Only Arbitrum supports WASM execution.** Our SpendingLimitPolicy runs as native Rust — ~8–9x cheaper | Performance-critical policy logic at L1 cost |
+| **Stylus (Rust/WASM)** ⭐ | **Only Arbitrum supports WASM execution.** Our SpendingLimitPolicy runs as native Rust — significantly cheaper | Performance-critical policy logic at L1 cost |
 | **~250ms blocks** | Real-time policy enforcement feels instant | Institutional UX — screening can't feel slow |
 | **Largest L2 TVL** | Where institutional money already lives | Product-market alignment |
 | **Orbit L3** | Custom chains can embed FortiLayer as a **native compliance layer** | Chain-level execution control |
@@ -192,18 +192,33 @@ The SpendingLimitPolicy is the **most frequently called policy** — every singl
 | Metric | Solidity Version | Stylus (Rust) Version |
 |---|---|---|
 | **Bytecode size** | ~4.2 KB EVM | **11.5 KB WASM** |
-| **Execution cost** | Standard EVM gas | **~8–9x cheaper** (WASM native) |
+| **Execution cost** | Standard EVM gas | **Estimated ~8–9x cheaper** (WASM native, based on Stylus benchmarks) |
 | **Language** | Solidity 0.8.20 | **Rust (stylus-sdk v0.10.0)** |
 | **Deployed** | `0x17580a...` (standby) | **`0xb92da5...`** (active in vault) |
 | **Status** | ✅ Verified (removed from vault) | ✅ **Active in vault pipeline** |
 
-**Measured on Arbitrum Sepolia (policy validation path only):**
+**Estimated gas savings (based on Stylus WASM benchmarks, not independently measured by us):**
 
-| | Gas |
+| | Gas (estimated) |
 |---|---|
 | Solidity `validate()` | ~42,000 gas |
 | Stylus `validate()` | ~4,800 gas |
-| **Improvement** | **~8–9x on hottest execution path** |
+| **Estimated improvement** | **~8–9x on hottest execution path** |
+
+> We have not run isolated gas profiling ourselves. These estimates are based on [Arbitrum Stylus documentation](https://docs.arbitrum.io/stylus/gentle-introduction) and general WASM-vs-EVM benchmarks. The real value is that Stylus `validate()` is called on every transfer and it works — limit breaches are blocked on-chain.
+
+### Verified On-Chain: Limit Breach Test
+
+We tested the Stylus contract directly on Arbitrum Sepolia (`0xb92da5...`). Results:
+
+```
+✅ 100 USDC   → PASS  (within limits)
+✅ 4999 USDC  → PASS  (just under 5,000 max-per-tx)
+🛑 5001 USDC  → BLOCKED (exceeds max-per-tx limit)
+🛑 10001 USDC → BLOCKED (exceeds daily limit)
+```
+
+The Stylus WASM contract correctly enforces both per-transaction and daily cumulative limits. Over-limit transfers revert.
 
 ### What "Active in Vault" Means
 
@@ -386,7 +401,7 @@ All administrative functions are properly gated. No open modifiers, no demo bypa
 | **Core** | PolicyEngine · TreasuryFirewall · TransactionExecutor | Orchestration, screening, execution |
 | **Vault** | Treasury · PolicyRegistry | Institutional vault + approved policy catalog |
 | **Policies** | SpendingLimit · Whitelist · Timelock · MultiSig · RiskScore · **OracleRiskScore** | 6 composable enforcement modules |
-| **Stylus** 🦀 | SpendingLimitPolicy (Rust/WASM) | Same logic, ~8–9x cheaper — **active in vault**, Solidity version on standby |
+| **Stylus** 🦀 | SpendingLimitPolicy (Rust/WASM) | Same logic, significant gas savings — **active in vault**, Solidity version on standby |
 | **Interfaces** | IPolicy · IPolicyEngine · ITreasury · ITreasuryFirewall · IChainlinkFeed | Clean abstraction boundaries |
 | **Mocks** | MockUSDC · MockChainlinkFeed | Deterministic testing |
 
@@ -610,7 +625,7 @@ FortiLayer/
 | **Vault deployment** | One-time setup per institutional vault |
 | **Policy subscription** | Managed policy config + monitoring |
 | **Premium modules** | Geo-blocking, AML scoring, regulatory reporting |
-| **Stylus performance** | Rust WASM execution — ~8–9x gas savings |
+| **Stylus performance** | Rust WASM execution — significant gas savings |
 | **Oracle feeds** | Live Chainlink risk scoring |
 
 **TAM:** $50B+ in DAO treasuries (40%+ YoY) + $10T+ RWA tokenization by 2030.

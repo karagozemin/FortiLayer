@@ -665,13 +665,28 @@ The Stylus version is a **1:1 mirror** of the Solidity SpendingLimitPolicy, depl
 
 SpendingLimitPolicy is the **hottest path** in the system — called on every single transfer. Moving it to WASM provides the highest ROI for gas optimization.
 
-#### Measured Performance
+#### Estimated Performance
 
 | Metric | Solidity | Stylus (Rust) |
 |---|---|---|
-| `validate()` gas | ~42,000 | ~4,800 |
+| `validate()` gas (estimated) | ~42,000 | ~4,800 |
 | Bytecode size | ~4.2 KB (EVM) | 11.5 KB (WASM) |
-| **Improvement** | baseline | **~8–9x cheaper** |
+| **Estimated improvement** | baseline | **~8–9x cheaper** |
+
+> Gas estimates are based on Arbitrum Stylus documentation and WASM-vs-EVM benchmarks, not independently profiled by us.
+
+#### Verified On-Chain: Limit Breach Test
+
+The Stylus contract was tested directly on Arbitrum Sepolia:
+
+```
+✅ 100 USDC   → PASS  (within limits)
+✅ 4999 USDC  → PASS  (just under 5,000 max-per-tx)
+🛑 5001 USDC  → BLOCKED (exceeds max-per-tx limit)
+🛑 10001 USDC → BLOCKED (exceeds daily limit)
+```
+
+Both per-transaction and daily cumulative limits are correctly enforced by the WASM contract.
 
 #### Storage Layout
 
@@ -857,7 +872,7 @@ Layer 4: CIRCUIT BREAKERS (3 Independent)
 
 | Technique | Impact |
 |---|---|
-| **WASM native execution** | ~8–9x cheaper than EVM for compute-heavy paths |
+| **WASM native execution** | Estimated ~8–9x cheaper than EVM for compute-heavy paths (based on Stylus benchmarks) |
 | **Rust zero-cost abstractions** | No runtime overhead |
 | **Targeted deployment** | Only the hottest path (SpendingLimit) moved to Stylus |
 | **Active in vault** | Real gas savings on every transfer, not theoretical |
