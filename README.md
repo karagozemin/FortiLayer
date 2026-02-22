@@ -33,12 +33,12 @@ Six policy modules — spending limits, whitelists, timelocks, multi-sig, risk s
 
 | | |
 |---|---|
-| 🔒 **What** | Composable policy pipeline — every transfer validated atomically against 6 independent modules |
+| 🔒 **What** | Composable policy pipeline — every transfer validated atomically against independent modules |
 | 🏛 **Who** | DAOs, RWA issuers, institutional custodians, on-chain funds |
 | 🔵 **Why Arbitrum** | 5+ inter-contract calls per transfer = only viable on L2. Stylus = only possible on Arbitrum |
 | 🦀 **Stylus** | SpendingLimitPolicy in Rust/WASM — **actively in the vault pipeline**, not a side demo. Replaced Solidity version on-chain. |
 | 🔗 **Oracle** | Live Chainlink ETH/USD — market stress automatically tightens execution permissions |
-| ✅ **Status** | 12 contracts deployed & verified · 140 tests · Full React dashboard · Live on Arbitrum Sepolia |
+| ✅ **Status** | 12 contracts deployed & verified · 4 active in vault · 140 tests · Full React dashboard · Live on Arbitrum Sepolia |
 
 [Architecture](#-architecture) · [Why Arbitrum?](#-why-arbitrum) · [Stylus](#-stylus--the-performance-layer) · [Oracle](#-adaptive-risk--chainlink-oracle) · [Deployment](#-deployed-contracts) · [Demo](#-demo) · [Full Architecture ↗](ARCHITECTURE.md)
 
@@ -60,9 +60,10 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | **Two-phase atomic validation** | validate() → record(). Zero state pollution on failure. Off-chain simulation. |
 | **3-layer circuit breaker** | Any single pause freezes everything. Three independent kill switches. |
 | **Full access control enforced** | onlyOwner, onlyVaultOwner, RBAC roles — all enforced. Not demo mode. |
-| **Multi-sig 2-of-N approval** | Real M-of-N threshold — 4 registered signers, 2 required to approve. |
+| **Multi-sig M-of-N approval** | Real M-of-N threshold — 5 registered signers, configurable required approvals. Deployed & configured but removed from active vault for judge demo accessibility. |
+| **Open transfer flow** | Anyone can connect a wallet and transfer — policies enforce rules, not RBAC. Judges can test without deployer keys. |
 | **140 tests · 12 verified contracts · Stylus WASM deployed** | Production-grade, verifiable, not theoretical. |
-| **Full React dashboard** | WalletConnect + pre-flight simulation + 4 pages. Users see errors before spending gas. |
+| **Full React dashboard** | WalletConnect + pre-flight simulation + whitelisted address quick-pick + 4 pages. Users see errors before spending gas. |
 
 ---
 
@@ -74,8 +75,8 @@ Everything below is shipped, deployed, and verified — not planned, not mocked:
 | **Uses Stylus** | SpendingLimitPolicy written in Rust, compiled to WASM, **actively in the vault pipeline** — [`0xb92da5...`](https://sepolia.arbiscan.io/address/0xb92da51e406b72fddd4cdc03b32ddd2bdeeb1c6e) |
 | **Real oracle integration** | Live Chainlink ETH/USD feed — adaptive risk scoring, not mock data |
 | **Real-world use case** | Institutional treasury protection — $50B+ addressable market |
-| **Technical depth** | 6 composable policies · 140 tests · two-phase atomic validation · 3-layer circuit breaker |
-| **Complete product** | Smart contracts + React dashboard + WalletConnect + pre-flight simulation |
+| **Technical depth** | 6 composable policies (4 active in vault) · 140 tests · two-phase atomic validation · 3-layer circuit breaker |
+| **Complete product** | Smart contracts + React dashboard + WalletConnect + pre-flight simulation + open demo flow |
 
 ---
 
@@ -174,7 +175,7 @@ FortiLayer was designed against real-world treasury attack vectors. Every scenar
 | 1 | **Treasury drain** | Compromised key submits max withdrawal | ❌ **BLOCKED** — exceeds daily spending limit | SpendingLimitPolicy (Stylus) |
 | 2 | **Unauthorized recipient** | Funds redirected to attacker address | ❌ **BLOCKED** — address not on whitelist | WhitelistPolicy |
 | 3 | **Rapid-fire extraction** | Multiple small txs in quick succession | ❌ **BLOCKED** — cooldown period not expired | TimelockPolicy |
-| 4 | **Single-signer abuse** | One compromised signer drains vault | ❌ **BLOCKED** — 2-of-N approval threshold not met | MultiSigPolicy |
+| 4 | **Single-signer abuse** | One compromised signer drains vault | ❌ **BLOCKED** — M-of-N approval threshold not met | MultiSigPolicy (deployed, not in active vault — can be re-attached) |
 | 5 | **High-risk counterparty** | Transfer to flagged/unknown address | ❌ **BLOCKED** — risk score below minimum threshold | RiskScorePolicy |
 | 6 | **Cumulative drain** | Many small txs that individually pass limits | ❌ **BLOCKED** — daily cumulative limit exceeded | SpendingLimitPolicy (Stylus) |
 | 7 | **Emergency exploit** | Active attack detected | 🛑 **HALTED** — emergency pause freezes all operations | Circuit Breaker (3-layer) |
@@ -384,7 +385,7 @@ All administrative functions are properly gated. No open modifiers, no demo bypa
 | 1 | **💳 SpendingLimitPolicy** | Daily cumulative + per-tx max | Auto-reset at UTC boundary. **Runs as Stylus/WASM in the active vault pipeline** 🦀 |
 | 2 | **✅ WhitelistPolicy** | Per-vault recipient allowlists | Zero-trust. Batch add/remove |
 | 3 | **⏱ TimelockPolicy** | Cooldown between txs | Prevents rapid-fire extraction |
-| 4 | **✍️ MultiSigPolicy** | M-of-N signer approval | 2-of-N threshold. Pre-registered signers only. Approvals cleared after execution |
+| 4 | **✍️ MultiSigPolicy** | M-of-N signer approval | Configurable threshold (currently 1-of-5). Pre-registered signers only. Deployed & configured but **removed from active vault** for judge demo accessibility. Can be re-attached via `addPolicy()`. |
 | 5 | **📈 RiskScorePolicy** | 0–100 address scoring | Blocks transfers below threshold |
 | 6 | **🔮 OracleRiskScorePolicy** | **Live Chainlink volatility** | Adaptive — market stress → tighter permissions. [Details ↑](#-adaptive-risk--chainlink-oracle) |
 
@@ -415,8 +416,8 @@ All contracts use OpenZeppelin v5.1 (Ownable, Pausable, AccessControl, Reentranc
 
 | Page | What It Does |
 |---|---|
-| **Dashboard** | Mint USDC · Deposit · Transfer with **pre-flight validation** (errors shown before gas spend). Auto-approves MultiSig before transfer. |
-| **Policy Manager** | Configure all 6 policies · MultiSig approval UI |
+| **Dashboard** | Mint USDC · Deposit · Transfer with **pre-flight validation** (errors shown before gas spend). Whitelisted address quick-pick buttons for easy recipient selection. |
+| **Policy Manager** | View & configure all policies. Active policies show live on-chain params. MultiSig card shows as inactive (deployed but not in vault). SpendingLimit config gated to contract owner with visible warning for non-owners. |
 | **Transactions** | History timeline · Pass/block badges · Arbiscan links |
 | **Firewall Status** | System health · Emergency pause/unpause for all 3 contracts |
 
@@ -429,12 +430,21 @@ All contracts use OpenZeppelin v5.1 (Ownable, Pausable, AccessControl, Reentranc
 8-step interactive demo — deploys everything and attacks the vault:
 
 ```
- ✅ Valid Transfer         → PASSED (all 5 policies)
- ❌ Over-Limit Transfer   → BLOCKED (SpendingLimitPolicy)
+ ✅ Valid Transfer         → PASSED (all 4 active policies)
+ ❌ Over-Limit Transfer   → BLOCKED (SpendingLimitPolicy / Stylus WASM)
  ❌ Non-Whitelisted Addr  → BLOCKED (WhitelistPolicy)
  ❌ Risky Address          → BLOCKED (RiskScorePolicy)
- ❌ No MultiSig Approval   → BLOCKED (MultiSigPolicy)
  🛑 Emergency Pause       → HALTED → ✅ Resumed
+```
+
+**Live on Arbitrum Sepolia — any wallet can test:**
+```
+1. Connect wallet (any wallet, no deployer keys needed)
+2. Mint test USDC
+3. Deposit to Treasury
+4. Transfer to a whitelisted address → PASS
+5. Transfer over 5,000 USDC → BLOCKED by SpendingLimit (Stylus)
+6. Transfer to non-whitelisted address → BLOCKED by Whitelist
 ```
 
 ```bash
@@ -477,18 +487,29 @@ cd arbitrum-policy-engine && npx hardhat run scripts/demo.ts
 
 ### Live Vault Configuration
 
-The vault is configured with 5 active policies enforcing AND-logic on every transfer:
+The vault is configured with **4 active policies** enforcing AND-logic on every transfer:
 
 ```
 Treasury Vault: 0x9BcF0E126b82C8E7cC5151C77025b052732eC52E
-├── MultiSigPolicy       → 2-of-N signers required (4 registered signers)
-├── WhitelistPolicy      → Per-vault recipient allowlists
+├── SpendingLimitPolicy  → Stylus WASM ⚡ (daily 10K, per-tx 5K USDC)
+├── WhitelistPolicy      → Per-vault recipient allowlists (5 addresses)
 ├── RiskScorePolicy      → Min threshold: 50/100
-├── TimelockPolicy       → Cooldown between transfers
-└── SpendingLimitPolicy  → Stylus WASM ⚡ (Solidity version removed from vault)
+└── TimelockPolicy       → Cooldown between transfers
 ```
 
-> **Note:** The Solidity SpendingLimitPolicy (`0x17580a...`) is deployed and verified but **not in the active vault pipeline**. It was replaced by the Stylus version on-chain via `removePolicy()` + `addPolicy()`.
+**Not in active vault (deployed & configured):**
+```
+├── MultiSigPolicy       → 1-of-5 threshold, 5 registered signers
+│                          Removed from vault so judges can test transfers
+│                          without being pre-registered signers.
+│                          Can be re-attached via addPolicy().
+├── SpendingLimitPolicy  → Solidity version (standby, replaced by Stylus)
+└── OracleRiskScorePolicy → Deployed, not attached to vault
+```
+
+> **Why MultiSig was removed:** MultiSigPolicy requires callers to be pre-registered signers. Judges connecting with their own wallets would be blocked. The policy is fully functional and can be re-attached — we removed it for demo accessibility, not because it doesn't work.
+
+> **Transfer access:** `requestTransfer()` has no role check — **anyone can connect a wallet and transfer**. The policies themselves (spending limits, whitelist, timelock, risk score) are the access control.
 
 ---
 
@@ -639,7 +660,7 @@ FortiLayer/
 | Composable policies | ❌ | ❌ | **✅ 6 modules, AND logic** |
 | Stylus (Rust/WASM) | ❌ | ❌ | **✅ Active in vault pipeline** |
 | Live oracle risk | ❌ | ❌ | **✅ Chainlink adaptive** |
-| Multi-sig M-of-N | Per-wallet | ❌ | **✅ 2-of-N, pre-registered signers** |
+| Multi-sig M-of-N | Per-wallet | ❌ | **✅ M-of-N, pre-registered signers** (deployed, configurable) |
 | Pre-flight simulation | ❌ | ❌ | **✅ Off-chain validate()** |
 | Per-vault config | Per-wallet | Global | **✅ Per-vault policies** |
 | Access control | Varies | Limited | **✅ onlyOwner + RBAC enforced** |

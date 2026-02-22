@@ -46,6 +46,7 @@ const Dashboard: React.FC = () => {
   const [depositAmount, setDepositAmount] = useState('');
   const [txPending, setTxPending] = useState('');
   const [lastTxResult, setLastTxResult] = useState<{ type: 'success' | 'error'; msg: string; hash?: string } | null>(null);
+  const [whitelistedAddrs, setWhitelistedAddrs] = useState<string[]>([]);
 
   const fetchData = useCallback(async () => {
     if (!provider) return;
@@ -72,6 +73,13 @@ const Dashboard: React.FC = () => {
         treasuryBalance, totalVaults, totalTxValidated, totalScreened, totalPassed, totalBlocked,
         activePolicies: vaultPolicies.length, isPaused, walletUSDC, walletAllowance,
       });
+
+      // Fetch whitelist for quick-pick in transfer UI
+      try {
+        const wl = new ethers.Contract(DEPLOYED_ADDRESSES.whitelistPolicy, ABIS.WhitelistPolicy, provider);
+        const list: string[] = await wl.getVaultWhitelist(DEPLOYED_ADDRESSES.treasury);
+        setWhitelistedAddrs(list);
+      } catch { /* skip */ }
 
       const filter = fw.filters.TransactionScreened();
       const currentBlock = await provider.getBlockNumber();
@@ -394,6 +402,23 @@ const Dashboard: React.FC = () => {
             <div className="form-group">
               <label>Recipient Address</label>
               <input className="input mono" placeholder="0x..." value={sendTo} onChange={e => setSendTo(e.target.value)} />
+              {whitelistedAddrs.length > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-3)' }}>Whitelisted addresses: </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                    {whitelistedAddrs.map(a => (
+                      <button
+                        key={a}
+                        className="btn"
+                        style={{ fontSize: 10.5, padding: '3px 8px', background: sendTo.toLowerCase() === a.toLowerCase() ? 'var(--green-dim)' : 'var(--bg-3)', color: sendTo.toLowerCase() === a.toLowerCase() ? 'var(--green)' : 'var(--text-2)', border: sendTo.toLowerCase() === a.toLowerCase() ? '1px solid var(--green)' : '1px solid var(--border)', borderRadius: 6, cursor: 'pointer' }}
+                        onClick={() => setSendTo(a)}
+                      >
+                        {shortenAddress(a)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="input-row">
               <div className="form-group">

@@ -53,16 +53,16 @@ FortiLayer is a **multi-contract execution firewall** that sits between an insti
 │  │                    POLICY PIPELINE                           │   │
 │  │                                                              │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │   │
-│  │  │ Spending │ │ Whitelist│ │ Timelock │ │ MultiSig │       │   │
-│  │  │  Limit   │ │          │ │          │ │  2-of-N  │       │   │
+│  │  │ Spending │ │ Whitelist│ │ Timelock │ │   Risk   │       │   │
+│  │  │  Limit   │ │          │ │          │ │  Score   │       │   │
 │  │  │🦀 Stylus │ │          │ │          │ │          │       │   │
 │  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │   │
-│  │  ┌──────────┐ ┌──────────┐                                  │   │
-│  │  │  Risk    │ │  Oracle  │                                  │   │
-│  │  │  Score   │ │Risk(CL)  │                                  │   │
-│  │  └──────────┘ └──────────┘                                  │   │
+│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐                     │   │
+│  │  │ MultiSig │ │  Oracle  │ │          │  ← standby          │   │
+│  │  │(standby) │ │Risk(CL)  │ │          │                     │   │
+│  │  └──────────┘ └──────────┘ └──────────┘                     │   │
 │  │                                                              │   │
-│  │              ALL must pass (AND logic)                       │   │
+│  │          4 ACTIVE must pass (AND logic)                      │   │
 │  └─────────────────────────────────────────────────────────────┘   │
 │                                                                     │
 │  ┌────────────────┐   ┌──────────────────┐                         │
@@ -124,11 +124,10 @@ User
  │   │   ├── PHASE 1: VALIDATE (view calls — no state change)
  │   │   │   ├── for each policy in vault.policies:
  │   │   │   │   └── IPolicy(policy).validate(vault, token, to, amount)
- │   │   │   │       ├── Policy[0]: MultiSigPolicy (2-of-N approval check)
+ │   │   │   │       ├── Policy[0]: SpendingLimitPolicy 🦀 (Stylus WASM)
  │   │   │   │       ├── Policy[1]: WhitelistPolicy (recipient check)
  │   │   │   │       ├── Policy[2]: RiskScorePolicy (address scoring)
- │   │   │   │       ├── Policy[3]: TimelockPolicy (cooldown check)
- │   │   │   │       └── Policy[4]: SpendingLimitPolicy 🦀 (Stylus WASM)
+ │   │   │   │       └── Policy[3]: TimelockPolicy (cooldown check)
  │   │   │   │           ├── ✅ pass → continue
  │   │   │   │           └── ❌ revert → TransactionNotCompliant
  │   │   │   │
@@ -564,8 +563,9 @@ Signers must be **pre-registered** by the contract owner via `addSigner()`. Only
 
 #### Current On-Chain Configuration
 
-- **Required approvals:** 2
-- **Registered signers:** 4
+- **Required approvals:** 1 (lowered from 2 for demo accessibility)
+- **Registered signers:** 5
+- **Vault status:** ⚠️ **Removed from active vault pipeline** — deployed and fully configured but not enforcing. Judges would need to be pre-registered signers to approve transactions, which isn't practical for a demo. Can be re-attached via `policyEngine.addPolicy(vault, multiSigAddress)`.
 
 ---
 
@@ -785,13 +785,17 @@ FortiLayer enforces access control across all contracts. Every administrative fu
 
 ### Transfer Authorization Model
 
-Transfers are authorized by the **policy pipeline**, not by RBAC roles. Anyone can call `requestTransfer()`, but the transfer only executes if:
-1. All 5 active policies pass validation (AND logic)
-2. MultiSig has ≥ 2 approvals from registered signers
-3. Recipient is whitelisted
-4. Spending limits not exceeded
-5. Cooldown period elapsed
-6. Risk score above threshold
+Transfers are authorized by the **policy pipeline**, not by RBAC roles. **Anyone can call `requestTransfer()`** — there is no role check on this function by design. The transfer only executes if all active policies pass validation:
+
+1. All 4 active policies pass validation (AND logic)
+2. Recipient is whitelisted (WhitelistPolicy)
+3. Spending limits not exceeded (SpendingLimitPolicy / Stylus WASM)
+4. Cooldown period elapsed (TimelockPolicy)
+5. Risk score above threshold (RiskScorePolicy)
+
+> **Why open access?** For a hackathon demo, judges need to connect their own wallets and test transfers. The policies themselves enforce the rules — not wallet-based RBAC. Policy *configuration* (changing limits, adding whitelist entries) remains owner-only.
+
+> **MultiSigPolicy** is deployed and fully functional (1-of-5 threshold, 5 signers) but removed from the active vault because judges cannot be pre-registered as signers. It can be re-attached instantly via `addPolicy()`.
 
 ---
 
@@ -813,12 +817,12 @@ Layer 2: EXECUTION FIREWALL
   └── Firewall only acts after PolicyEngine approval
 
 Layer 3: POLICY PIPELINE (AND Logic)
-  ├── SpendingLimitPolicy 🦀 — cumulative + per-tx caps (Stylus WASM)
-  ├── WhitelistPolicy — recipient allowlist
-  ├── TimelockPolicy — cooldown enforcement
-  ├── MultiSigPolicy — 2-of-N approval (4 registered signers)
-  ├── RiskScorePolicy — address scoring
-  └── OracleRiskScorePolicy — market-adaptive risk
+  ├── SpendingLimitPolicy 🦀 — cumulative + per-tx caps (Stylus WASM)   [ACTIVE]
+  ├── WhitelistPolicy — recipient allowlist                          [ACTIVE]
+  ├── TimelockPolicy — cooldown enforcement                          [ACTIVE]
+  ├── RiskScorePolicy — address scoring                              [ACTIVE]
+  ├── MultiSigPolicy — M-of-N approval (deployed, not in vault)      [STANDBY]
+  └── OracleRiskScorePolicy — market-adaptive risk (deployed)         [STANDBY]
 
 Layer 4: CIRCUIT BREAKERS (3 Independent)
   ├── PolicyEngine.pause()   — blocks all validation
@@ -958,7 +962,6 @@ interface IChainlinkFeed {
 └──────────────────────────────────────────────────────────┘
 
 ┌─ Policies (Active in Vault Pipeline) ───────────────────┐
-│ MultiSigPolicy       0x88010789fF9109A00912F9a9a62414D8  │ 2-of-N
 │ WhitelistPolicy      0x1EdaAD6c6F5C8d5fb901e83f73b3BD0D  │
 │ RiskScorePolicy      0x54305829743e301ebF8D868037B4081c  │
 │ TimelockPolicy       0xa9BB981a309DEf9b74A390f2170fE56C  │
@@ -966,6 +969,7 @@ interface IChainlinkFeed {
 └──────────────────────────────────────────────────────────┘
 
 ┌─ Policies (Deployed, Not in Vault) ─────────────────────┐
+│ MultiSigPolicy       0x88010789fF9109A00912F9a9a62414D8  │ 1-of-5, standby
 │ SpendingLimitPolicy  0x17580a550087C55CF68AD9Cc19F56862  │ Solidity (standby)
 │ OracleRiskScorePolicy 0x52d4E065453d0E3aabE727A38A33bFb │ (not in vault pipeline)
 └──────────────────────────────────────────────────────────┘
@@ -989,11 +993,11 @@ Treasury ──approves──▶ TreasuryFirewall ──validates──▶ Polic
     │                        │                       iterates over
     │                        │                              │
     │                   executes                    ┌───────┴───────┐
-    │               safeTransferFrom                │  Policy[0..4] │
+    │               safeTransferFrom                │  Policy[0..3] │
     │                                               │  .validate()  │
     │                                               │  .record()    │
     │                                               │               │
-    │                                               │  [4] = Stylus │
+    │                                               │  [0] = Stylus │
     │                                               │  🦀 WASM      │
     │                                               └───────────────┘
     │

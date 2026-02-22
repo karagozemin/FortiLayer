@@ -541,6 +541,13 @@ const PolicyManager: React.FC = () => {
                       <span className="p-value" style={{ color: 'var(--purple)' }}>{msRequired} of {msSigners.length} signers</span>
                     </div>
 
+                    {!p.active && (
+                      <div style={{ fontSize: 11, color: 'var(--text-3)', background: 'var(--bg-3)', padding: '8px 10px', borderRadius: 8, marginTop: 8, lineHeight: 1.5 }}>
+                        🔒 Not attached to vault — deployed &amp; configured but not enforcing. Signers: {msSigners.map(s => shortenAddress(s)).join(', ')}
+                      </div>
+                    )}
+
+                    {p.active && (<>
                     {/* Compact tab bar */}
                     <div className="ms-tabs">
                       {(['approve', 'status', 'admin'] as const).map(tab => (
@@ -622,6 +629,7 @@ const PolicyManager: React.FC = () => {
                         </div>
                       </div>
                     )}
+                    </>)}
                   </div>
                 )}
 
