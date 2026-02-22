@@ -99,6 +99,58 @@ FortiLayer is a **multi-contract execution firewall** that sits between an insti
               call engine   (view calls)   ALL pass      transfer       Arbiscan
 ```
 
+### Active Vault Pipeline (Current On-Chain State)
+
+```
+  requestTransfer(token, to, amount)
+          │
+          ▼
+  ┌──────────────┐
+  │   Treasury   │  holds all ERC-20 tokens
+  └──────┬───────┘
+         │
+         ▼
+  ┌──────────────────┐
+  │ TreasuryFirewall │  screen + authorize
+  └──────┬───────────┘
+         │
+         ▼
+  ┌──────────────────┐
+  │  PolicyEngine    │  iterates vault.policies[]
+  └──────┬───────────┘
+         │
+         ├─────────────────────────────────────────────┐
+         │  ALL 4 must pass (AND logic)                │
+         │                                             │
+         ▼                                             │
+  ┌─────────────────┐   ┌─────────────────┐           │
+  │ SpendingLimit 🦀│   │  WhitelistPolicy│           │
+  │ (Stylus WASM)   │   │  (Solidity)     │           │
+  │ daily + per-tx  │   │  recipient check│           │
+  └────────┬────────┘   └────────┬────────┘           │
+           │                     │                     │
+           ▼                     ▼                     │
+  ┌─────────────────┐   ┌─────────────────┐           │
+  │ RiskScorePolicy │   │ TimelockPolicy  │           │
+  │ (Solidity)      │   │ (Solidity)      │           │
+  │ address scoring │   │ cooldown check  │           │
+  └────────┬────────┘   └────────┬────────┘           │
+           │                     │                     │
+           └──────────┬──────────┘                     │
+                      │                                │
+                      ▼                                │
+              ALL PASSED? ◄────────────────────────────┘
+                   │
+            ┌──────┴──────┐
+            ▼             ▼
+        ✅ Execute    ❌ Revert
+       ERC-20 transfer  (policy-specific error)
+```
+
+> **MultiSigPolicy** and **OracleRiskScorePolicy** are deployed but not in this pipeline. See [Deployment Topology](#deployment-topology) for details.
+
+---
+
 ### Detailed Call Sequence
 
 ```
