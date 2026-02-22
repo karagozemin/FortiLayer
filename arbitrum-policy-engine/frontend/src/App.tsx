@@ -4,6 +4,7 @@ import PolicyManager from './components/PolicyManager';
 import TransactionQueue from './components/TransactionQueue';
 import FirewallStatus from './components/FirewallStatus';
 import DarkVeil from './components/DarkVeil';
+import Landing from './components/Landing';
 import { ToastProvider } from './components/Toast';
 import { WalletProvider, useWallet, ARBITRUM_SEPOLIA_CHAIN_ID } from './hooks/useWallet';
 import {
@@ -35,46 +36,12 @@ const AppContent: React.FC = () => {
   const wrongChain = isConnected && chainId !== ARBITRUM_SEPOLIA_CHAIN_ID;
   const canNavigate = isConnected && !wrongChain;
 
+  /* ── Landing page (not connected) ─────────────────────── */
+  if (!isConnected) {
+    return <Landing />;
+  }
+
   const renderContent = () => {
-    if (!isConnected) {
-      return (
-        <div className="welcome">
-          <img src={logoImg} alt="FortiLayer" className="welcome-logo" />
-          <h2>Welcome to FortiLayer</h2>
-          <p>
-            Programmable treasury execution firewall deployed on Arbitrum Sepolia.
-            Connect your wallet to monitor and manage on-chain security policies.
-          </p>
-
-          <div className="features">
-            <div className="feat">
-              <div className="feat-icon" style={{ background: 'var(--blue-dim)' }}>
-                <IconShield style={{ color: 'var(--blue)' }} />
-              </div>
-              <span>Real-time Screening</span>
-            </div>
-            <div className="feat">
-              <div className="feat-icon" style={{ background: 'var(--green-dim)' }}>
-                <IconPolicy style={{ color: 'var(--green)' }} />
-              </div>
-              <span>5 Policy Modules</span>
-            </div>
-            <div className="feat">
-              <div className="feat-icon" style={{ background: 'var(--purple-dim)' }}>
-                <IconFirewall style={{ color: 'var(--purple)' }} />
-              </div>
-              <span>On-chain Verified</span>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '8px' }}>
-            <appkit-button />
-          </div>
-          {error && <p style={{ color: 'var(--red)', fontSize: '13px' }}>{error}</p>}
-        </div>
-      );
-    }
-
     if (wrongChain) {
       return (
         <div className="wrong-net">
